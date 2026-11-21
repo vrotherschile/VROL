@@ -1,17 +1,55 @@
-<!doctype html><html lang="es"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VROL — Sistema de Sistematización de Universos de Rol</title>
-<link rel="stylesheet" href="styles.css"></head><body>
-<header><div class="brand"><b>VROL</b><small>Sistema de Sistematización de Universos de Rol</small></div>
-<nav><a href="#inicio">Inicio</a><a href="#universos">Universos</a><a href="#mesas">Mesas</a><a href="#comunidad">Comunidad</a><button onclick="login()">Acceso</button></nav></header>
-<main>
-<section id="inicio" class="hero"><div id="banners"></div><div class="heroText"><small>UNIVERSOS · JUEGO ORGANIZADO · FAIR PLAY</small><h1>Construye, organiza y juega universos de rol.</h1><p>VROL conecta universos, personajes, mesas, sesiones y comunidades dentro de una estructura trazable y escalable.</p><button onclick="login()">Entrar a VROL</button></div></section>
-<section class="stats"><div><b id="visits">0</b><span>Visitas</span></div><div><b id="univ">0</b><span>Universos activos</span></div><div><b id="tables">0</b><span>Mesas visibles</span></div><div><b id="players">—</b><span>Jugadores inscritos</span></div></section>
-<section id="universos"><div class="heading"><div><small>EXPLORA</small><h2>Universos</h2></div><p>Espacios oficiales donde viven personajes, mesas y campañas.</p></div><div id="universeCards" class="grid"></div></section>
-<section id="mesas" class="dark"><div class="heading"><div><small>ACTIVIDAD</small><h2>Mesas en actividad</h2></div><p>La actividad puede visualizarse públicamente sin permitir acceso directo a una mesa.</p></div><div id="tableCards" class="grid"></div></section>
-<section id="comunidad"><div class="heading"><div><small>COMUNIDAD</small><h2>Noticias y publicaciones</h2></div><p>Actualizaciones, novedades y contenidos oficiales de VROL.</p></div><article id="featured"></article><div id="posts" class="grid"></div>
-<h2 class="sub">Videos</h2><div id="videos" class="videos"></div></section>
-</main><footer>VROL · V1.0 <span>Plataforma en desarrollo</span></footer>
-<div id="loginModal" class="modal hide"><div class="modalBox"><button class="x" onclick="closeLogin()">×</button><h2>Acceso VROL</h2><form id="loginForm"><label>Usuario<input id="user" required></label><label>Contraseña<input id="pass" type="password" required></label><button>Ingresar</button><p id="loginMsg"></p></form></div></div>
-<div id="appModal" class="modal hide"><div class="modalBox wide"><button class="x" onclick="closeApp()">×</button><div id="app"></div></div></div>
-<script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VROL | Sistema de Sistematización de Universos de Rol</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="publicApp">
+<header class="topbar">
+  <a class="logo" href="#inicio"><span>VROL</span><small>SISTEMA DE SISTEMATIZACIÓN DE UNIVERSOS DE ROL</small></a>
+  <nav><a href="#universos">Universos</a><a href="#mesas">Mesas</a><a href="#comunidad">Comunidad</a><button class="btn ghost" onclick="showLogin()">Acceder</button></nav>
+</header>
+<section id="inicio" class="hero">
+  <div id="heroSlides"></div>
+  <div class="heroShade"></div>
+  <div class="heroContent">
+    <span class="eyebrow">VROL · CORE · JO · SUR · FP</span>
+    <h1>Un sistema para<br><em>crear universos de rol.</em></h1>
+    <p>VROL organiza universos, personajes, mesas, sesiones y comunidad en una plataforma única.</p>
+    <div class="actions"><button class="btn primary" onclick="showLogin()">Entrar a VROL</button><a class="btn ghost" href="#universos">Explorar comunidad</a></div>
+  </div>
+</section>
+<section class="metrics"><div><strong id="mVisits">0</strong><span>VISITAS</span></div><div><strong id="mPlayers">0</strong><span>JUGADORES</span></div><div><strong id="mUniverses">0</strong><span>UNIVERSOS ACTIVOS</span></div><div><strong id="mTables">0</strong><span>MESAS ACTIVAS</span></div></section>
+<section id="universos" class="section"><div class="sectionHead"><div><span class="eyebrow">UNIVERSOS</span><h2>Explora los mundos</h2></div><p>Los universos son espacios persistentes donde se organizan personajes, mesas y campañas.</p></div><div id="universeGrid" class="cards"></div></section>
+<section id="mesas" class="section dark"><div class="sectionHead"><div><span class="eyebrow">JUEGO ORGANIZADO</span><h2>Actividad de mesas</h2></div><p>La comunidad puede conocer la actividad sin obtener acceso directo a mesas privadas.</p></div><div id="tableGrid" class="cards"></div></section>
+<section id="comunidad" class="section"><div class="sectionHead"><div><span class="eyebrow">COMUNIDAD</span><h2>Noticias y novedades</h2></div><p>Contenido publicado por la administración de VROL.</p></div><div id="featured"></div><div id="postGrid" class="cards"></div><h3 class="subhead">Videos</h3><div id="videoGrid" class="videos"></div></section>
+<footer><span>VROL V1.0</span><span>Plataforma de universos de rol</span></footer>
+</div>
+
+<div id="loginModal" class="overlay hidden">
+  <div class="modal">
+    <button class="close" onclick="hideLogin()">×</button>
+    <div class="modalLogo">VROL</div>
+    <h2>Acceso</h2>
+    <p class="muted">Ingresa a tu espacio de VROL.</p>
+    <form id="loginForm">
+      <label>Usuario<input id="loginUser" autocomplete="username" required></label>
+      <label>Contraseña<input id="loginPass" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary full" type="submit">Ingresar</button>
+      <div id="loginError" class="error"></div>
+    </form>
+  </div>
+</div>
+
+<div id="panelModal" class="overlay hidden">
+  <div class="panelModal">
+    <button class="close" onclick="closePanel()">×</button>
+    <div id="panel"></div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
