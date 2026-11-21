@@ -1,0 +1,17 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VROL — Sistema de Sistematización de Universos de Rol</title>
+<link rel="stylesheet" href="styles.css"></head><body>
+<header><div class="brand"><b>VROL</b><small>Sistema de Sistematización de Universos de Rol</small></div>
+<nav><a href="#inicio">Inicio</a><a href="#universos">Universos</a><a href="#mesas">Mesas</a><a href="#comunidad">Comunidad</a><button onclick="login()">Acceso</button></nav></header>
+<main>
+<section id="inicio" class="hero"><div id="banners"></div><div class="heroText"><small>UNIVERSOS · JUEGO ORGANIZADO · FAIR PLAY</small><h1>Construye, organiza y juega universos de rol.</h1><p>VROL conecta universos, personajes, mesas, sesiones y comunidades dentro de una estructura trazable y escalable.</p><button onclick="login()">Entrar a VROL</button></div></section>
+<section class="stats"><div><b id="visits">0</b><span>Visitas</span></div><div><b id="univ">0</b><span>Universos activos</span></div><div><b id="tables">0</b><span>Mesas visibles</span></div><div><b id="players">—</b><span>Jugadores inscritos</span></div></section>
+<section id="universos"><div class="heading"><div><small>EXPLORA</small><h2>Universos</h2></div><p>Espacios oficiales donde viven personajes, mesas y campañas.</p></div><div id="universeCards" class="grid"></div></section>
+<section id="mesas" class="dark"><div class="heading"><div><small>ACTIVIDAD</small><h2>Mesas en actividad</h2></div><p>La actividad puede visualizarse públicamente sin permitir acceso directo a una mesa.</p></div><div id="tableCards" class="grid"></div></section>
+<section id="comunidad"><div class="heading"><div><small>COMUNIDAD</small><h2>Noticias y publicaciones</h2></div><p>Actualizaciones, novedades y contenidos oficiales de VROL.</p></div><article id="featured"></article><div id="posts" class="grid"></div>
+<h2 class="sub">Videos</h2><div id="videos" class="videos"></div></section>
+</main><footer>VROL · V1.0 <span>Plataforma en desarrollo</span></footer>
+<div id="loginModal" class="modal hide"><div class="modalBox"><button class="x" onclick="closeLogin()">×</button><h2>Acceso VROL</h2><form id="loginForm"><label>Usuario<input id="user" required></label><label>Contraseña<input id="pass" type="password" required></label><button>Ingresar</button><p id="loginMsg"></p></form></div></div>
+<div id="appModal" class="modal hide"><div class="modalBox wide"><button class="x" onclick="closeApp()">×</button><div id="app"></div></div></div>
+<script src="app.js"></script></body></html>
