@@ -1,4 +1,4 @@
-const API=localStorage.getItem("VROL_API")||"PEGAR_URL_APPS_SCRIPT_AQUI";
+const API=localStorage.getItem("VROL_API")||"https://script.google.com/macros/s/AKfycbx0N2kVzt6DZK4Nofz9T--JuaqLzKODr4i6i0zUm9IWikxJUCuXtElXqcBjv7JCrAOC/exec";
 let token=localStorage.getItem("VROL_TOKEN")||"", currentUser=null, state={};
 
 const $=s=>document.querySelector(s);
