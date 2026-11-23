@@ -60,37 +60,91 @@
 
 .apiStatus{margin-top:14px;color:#d98d8d;font-size:12px;min-height:18px}
 
-/* ===== VROL overflow / responsive hardening ===== */
-html, body { min-width: 0; max-width: 100%; overflow-x: hidden; }
-body { min-height: 100vh; }
-.overlay {
-  overflow: auto;
-  overscroll-behavior: contain;
+/* ===== VROL modal content scrolling ===== */
+/* These rules are intentionally scoped to the authenticated panel/modal. */
+#panelModal {
+  overflow: hidden;
   align-items: center;
   justify-items: center;
 }
-.modal, .panelModal { box-sizing: border-box; min-width: 0; }
-.panelModal {
+#panelModal .panelModal {
   width: min(1180px, calc(100vw - 24px));
   max-width: 100%;
   height: min(800px, calc(100dvh - 24px));
   max-height: calc(100dvh - 24px);
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
 }
-.panel {
+#panelModal .panel {
   width: 100%;
   height: 100%;
   min-width: 0;
   min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
 }
-.side, .content { min-width: 0; min-height: 0; }
-.content {
-  overflow: auto;
-  overflow-x: auto;
+#panelModal .side {
+  flex: 0 0 220px;
+  min-width: 0;
+  min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable both-edges;
+  overflow-x: hidden;
 }
+#panelModal .content {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 34px;
+}
+#panelModal .contentHeader,
+#panelModal .dataRow,
+#panelModal .profileHero,
+#panelModal .featured,
+#panelModal .two,
+#panelModal .formGrid,
+#panelModal .cmsGrid { min-width: 0; }
+#panelModal .contentHeader > *,
+#panelModal .dataRow > *,
+#panelModal .profileHero > *,
+#panelModal .featured > *,
+#panelModal .formGrid > *,
+#panelModal .cmsGrid > * { min-width: 0; }
+#panelModal .dataRow .main { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
+#panelModal .dataRow .main small { display: block; overflow-wrap: anywhere; word-break: break-word; }
+#panelModal .dataRow .rowActions { flex: 0 1 auto; min-width: 0; }
+#panelModal .formGrid input,
+#panelModal .formGrid textarea,
+#panelModal .formGrid select,
+#panelModal .cmsForm input,
+#panelModal .cmsForm textarea,
+#panelModal .cmsForm select { min-width: 0; max-width: 100%; }
+#panelModal .cards,
+#panelModal .videos,
+#panelModal .kpis,
+#panelModal .profileStats,
+#panelModal .specialtyGrid,
+#panelModal .derivedGrid,
+#panelModal .elementGrid,
+#panelModal .cmsGrid { min-width: 0; }
+#panelModal .card,
+#panelModal .cmsCard,
+#panelModal .kpi,
+#panelModal .profileSection,
+#panelModal .derivedCard,
+#panelModal .profileStat,
+#panelModal .specialtyBox,
+#panelModal .elementCard { min-width: 0; overflow-wrap: anywhere; }
+#panelModal .card p,
+#panelModal .featuredBody p,
+#panelModal .universeBody p { overflow-wrap: anywhere; }
 .contentHeader, .dataRow, .profileHero, .featured, .two, .formGrid, .cmsGrid { min-width: 0; }
 .contentHeader > *, .dataRow > *, .profileHero > *, .featured > *, .formGrid > *, .cmsGrid > * { min-width: 0; }
 .dataRow .main { min-width: 0; flex: 1 1 auto; overflow-wrap: anywhere; }
@@ -105,68 +159,66 @@ body { min-height: 100vh; }
 .card p, .featuredBody p, .universeBody p { overflow-wrap: anywhere; }
 
 @media (max-width: 800px) {
-  .overlay { padding: 12px; align-items: flex-start; }
-  .panelModal {
+  #panelModal { padding: 12px; align-items: flex-start; }
+  #panelModal .panelModal {
     width: 100%;
     height: calc(100dvh - 24px);
     max-height: calc(100dvh - 24px);
     border-radius: 12px;
   }
-  .panel {
+  #panelModal .panel {
     display: flex;
     flex-direction: column;
   }
-  .side {
+  #panelModal .side {
     flex: 0 0 auto;
     width: 100%;
     max-height: 78px;
     overflow-x: auto;
     overflow-y: hidden;
-    scrollbar-gutter: stable;
     white-space: nowrap;
     padding: 10px 8px;
   }
-  .sideBtn {
+  #panelModal .sideBtn {
     width: auto;
     min-width: max-content;
     display: inline-flex;
     align-items: center;
     white-space: nowrap;
   }
-  .content {
+  #panelModal .content {
     flex: 1 1 auto;
     width: 100%;
     min-height: 0;
+    max-height: none;
     padding: 18px 16px 28px;
+    overflow-y: auto;
+    overflow-x: auto;
   }
-  .contentHeader {
+  #panelModal .contentHeader {
     flex-direction: column;
     align-items: stretch;
   }
-  .contentHeader > .btn { align-self: flex-start; }
-  .dataRow {
+  #panelModal .contentHeader > .btn { align-self: flex-start; }
+  #panelModal .dataRow {
     align-items: flex-start;
     flex-direction: column;
   }
-  .dataRow .rowActions { width: 100%; }
-  .rowActions .btn { max-width: 100%; }
-  .formActions { flex-wrap: wrap; }
-  .formActions .btn { max-width: 100%; }
-  .cmsGrid { grid-template-columns: minmax(0, 1fr); }
-  .profileHero { overflow: hidden; }
-  .dicePanel, .profileSection, .cmsCard { overflow: hidden; }
+  #panelModal .dataRow .rowActions { width: 100%; }
+  #panelModal .formActions { flex-wrap: wrap; }
+  #panelModal .cmsGrid { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 480px) {
-  .overlay { padding: 8px; }
-  .panelModal { height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
-  .content { padding: 16px 12px 24px; }
-  .content h1 { font-size: 26px; }
-  .kpis { grid-template-columns: 1fr; }
-  .elementGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .topbar { padding: 0 4%; }
-  .actions { flex-wrap: wrap; }
-  .actions .btn { max-width: 100%; }
+  #panelModal { padding: 8px; }
+  #panelModal .panelModal {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  #panelModal .content { padding: 16px 12px 24px; }
+  #panelModal .content h1 { font-size: 26px; }
+  #panelModal .kpis { grid-template-columns: 1fr; }
+  #panelModal .elementGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 /* Make long controls and URLs wrap instead of forcing the page wider. */
