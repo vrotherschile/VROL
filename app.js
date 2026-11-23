@@ -1,4 +1,5 @@
-const API=localStorage.getItem("VROL_API")||"https://script.google.com/macros/s/AKfycbx0N2kVzt6DZK4Nofz9T--JuaqLzKODr4i6i0zUm9IWikxJUCuXtElXqcBjv7JCrAOC/exec";
+const DEFAULT_API="https://script.google.com/macros/s/AKfycbx0N2kVzt6DZK4Nofz9T--JuaqLzKODr4i6i0zUm9IWikxJUCuXtElXqcBjv7JCrAOC/exec";
+const API=String(localStorage.getItem("VROL_API")||DEFAULT_API).trim();
 let token=localStorage.getItem("VROL_TOKEN")||"", currentUser=null, state={};
 
 const $=s=>document.querySelector(s);
@@ -16,7 +17,11 @@ async function api(action,data={}){
 async function loadPublic(){
   try{
     const r=await api("publicData"); renderPublic(r.data);
-  }catch(e){console.warn(e.message)}
+  }catch(e){
+    console.warn("VROL API:",e.message);
+    const msg=$("#apiStatus");
+    if(msg) msg.textContent="API no disponible: "+e.message;
+  }
 }
 function renderPublic(d){
   $("#mVisits").textContent=d.stats.visits;
@@ -168,7 +173,7 @@ async function editCharacter(id){
   `<form id="cf" class="formGrid">
     ${field("Nombre","name")}
     <label>Jugador<select name="playerUsername" required><option value="">Seleccionar jugador...</option>${players.map(p=>`<option value="${esc(p.username)}" ${String(p.username)===String(x.playerUsername)?"selected":""}>${esc(p.username)}</option>`).join("")}</select></label>
-    <label>Universo<select name="universeId" ${canChangeUniverse?"":"disabled"} required>${universes.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(x.universeId)?"selected":""}>${esc(u.name)}</option>`).join("")}</select>${canChangeUniverse?"":"<small class="muted">Solo ADMIN puede cambiar el universo.</small>"}</label>
+    <label>Universo<select name="universeId" ${canChangeUniverse?"":"disabled"} required>${universes.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(x.universeId)?"selected":""}>${esc(u.name)}</option>`).join("")}</select>${canChangeUniverse?"":"<small class='muted'>Solo ADMIN puede cambiar el universo.</small>"}</label>
     <label class="full">Descripción<textarea name="description">${esc(x.description||"")}</textarea></label>
     <div class="full formActions"><button class="btn primary">Guardar cambios</button></div>
   </form>`;
@@ -302,7 +307,50 @@ function rollCharacterDie(c){
   $("#diceResult").innerHTML=`<div class="diceNumber">${d10}</div><div><b>${esc(trait)} ${traitBase} + ${esc(capacity)} ${capBase} + D10 ${d10}</b><br><span>Resultado total: <strong>${total}</strong>${specialty?` · Especialidad: ${esc(specialty)} (mín. D10 ${min})`:""}</span></div>`;
 }
 
-function tableForm(){ $("#content").innerHTML=head("Nueva mesa","Solo puede crearse dentro de un universo administrado por el GM.") + `<form id="tf" class="formGrid">${field("Nombre","name")}${field("Universo (ID)","universeId")}<label class="full">Descripción<textarea name="description"></textarea></label><div class="full formActions"><button class="btn primary">Crear mesa</button></div></form>`;$("#tf").onsubmit=async e=>{e.preventDefault();try{await api("createTable",formData(e.target));navigate("tables");loadPublic()}catch(x){alert(x.message)}}}
-function sessionForm(){ $("#content").innerHTML=head("Nueva sesión","Una sesión es una reunión temporal de una mesa.") + `<form id="sf" class="formGrid">${field("Mesa (ID)","tableId")}${field("Título","title")}${field("Inicio","startAt","datetime-local")}${field("Término","endAt","datetime-local")}${field("Módulo / capítulo","moduleTitle")}<label>Modalidad<select name="medium"><option>ONLINE</option><option>PRESENCIAL</option></select></label><div class="full formActions"><button class="btn primary">Crear sesión</button></div></form>`;$("#sf").onsubmit=async e=>{e.preventDefault();try{await api("createSession",formData(e.target));navigate("sessions")}catch(x){alert(x.message)}}}
+async function tableForm(){
+  try{
+    const r=await api("dashboard",{view:"universes"});
+    const universes=r.data.universes||[];
+    $("#content").innerHTML=head("Nueva mesa","Solo puede crearse dentro de un universo administrado por el GM.")+
+    `<form id="tf" class="formGrid">
+      ${field("Nombre","name")}
+      <label>Universo<select name="universeId" required><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("")}</select></label>
+      <label class="full">Descripción<textarea name="description"></textarea></label>
+      <div class="full formActions"><button class="btn primary">Crear mesa</button></div>
+    </form>`;
+    $("#tf").onsubmit=async e=>{
+      e.preventDefault();
+      try{
+        await api("createTable",formData(e.target));
+        navigate("tables");
+        loadPublic();
+      }catch(x){alert(x.message)}
+    };
+  }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
+}
+
+async function sessionForm(){
+  try{
+    const r=await api("dashboard",{view:"tables"});
+    const tables=r.data.tables||[];
+    $("#content").innerHTML=head("Nueva sesión","Una sesión es una reunión temporal de una mesa.")+
+    `<form id="sf" class="formGrid">
+      <label>Mesa<select name="tableId" required><option value="">Seleccionar mesa...</option>${tables.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.universeName||"")}</option>`).join("")}</select></label>
+      ${field("Título","title")}
+      ${field("Inicio","startAt","datetime-local")}
+      ${field("Término","endAt","datetime-local")}
+      ${field("Módulo / capítulo","moduleTitle")}
+      <label>Modalidad<select name="medium"><option value="ONLINE">ONLINE</option><option value="PRESENCIAL">PRESENCIAL</option></select></label>
+      <div class="full formActions"><button class="btn primary">Crear sesión</button></div>
+    </form>`;
+    $("#sf").onsubmit=async e=>{
+      e.preventDefault();
+      try{
+        await api("createSession",formData(e.target));
+        navigate("sessions");
+      }catch(x){alert(x.message)}
+    };
+  }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
+}
 async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");token="";currentUser=null;closePanel()}
 loadPublic();
