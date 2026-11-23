@@ -27,9 +27,15 @@ function renderPublic(d){
   $("#heroSlides").innerHTML=banners.map((b,i)=>`<div class="heroSlide" style="background-image:url('${esc(b.imageUrl)}');opacity:${i===0?1:0}"></div>`).join("");
   if(banners.length>1){let n=0;setInterval(()=>{const a=[...document.querySelectorAll(".heroSlide")];a.forEach(x=>x.style.opacity=0);n=(n+1)%a.length;a[n].style.opacity=1},5000)}
   $("#universeGrid").innerHTML=(d.universes||[]).map(u=>`
-    <article class="card"><div class="cardBody"><span class="tag">UNIVERSO ACTIVO</span>
-    <h3>${esc(u.name)}</h3><p>${esc(u.description||"Sin descripción pública.")}</p>
-    <span class="mini">GM principal: ${esc(u.primaryGMName||"Por definir")}</span></div></article>`).join("")||`<div class="empty">Todavía no hay universos públicos.</div>`;
+    <article class="card universeCard">
+      <div class="universeImage">${u.imageUrl?`<img src="${esc(u.imageUrl)}" alt="Imagen de ${esc(u.name)}" loading="lazy">`:`<div class="universeImageFallback">VROL</div>`}</div>
+      <div class="cardBody universeBody">
+        <span class="tag">UNIVERSO ACTIVO</span>
+        <h3>${esc(u.name)}</h3>
+        <p>${esc(u.description||"Sin descripción pública.")}</p>
+        <span class="mini">GM principal: ${esc(u.primaryGMName||"Por definir")}</span>
+      </div>
+    </article>`).join("")||`<div class="empty">Todavía no hay universos públicos.</div>`;
   $("#tableGrid").innerHTML=(d.tables||[]).map(t=>`
     <article class="card"><div class="cardBody"><span class="tag">${esc(t.status)}</span><h3>${esc(t.name)}</h3>
     <p>${esc(t.description||"Mesa de juego organizada.")}</p>
@@ -84,7 +90,9 @@ function draw(view,d){
  if(view==="audit")return drawAudit(d);
 }
 function drawUsers(d){$("#content").innerHTML=head("Usuarios","Administración de identidad, roles y progresión.",`<button class="btn primary" onclick="userForm()">+ Usuario</button>`)+`<div class="dataList">${d.users.map(u=>`<div class="dataRow"><div class="main"><b>${esc(u.username)}</b><small>${u.role} · Player ${u.playerLevel} · GM ${u.gmLevel}</small></div><span class="status">${u.active?"ACTIVO":"INACTIVO"}</span></div>`).join("")}</div>`}
-function drawUniverses(d){$("#content").innerHTML=head("Universos",currentUser.role==="ADMIN"?"Administración global de universos.":"Universos que administras.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="universeForm()">+ Universo</button>`:"")+`<div class="dataList">${d.universes.map(u=>`<div class="dataRow"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.description||"")} · GM principal: ${esc(u.primaryGMUsername||"—")} · ${u.gmCount} GM(s)</small></div><div><span class="status">${esc(u.status)}</span>${currentUser.role==="ADMIN"?` <button class="btn ghost" onclick="editUniverse('${u.id}')">Editar</button>`:""}</div></div>`).join("")||`<div class="empty">No hay universos disponibles.</div>`}</div>`}
+function drawUniverses(d){
+  state.universeGMOptions=d.gmOptions||state.universeGMOptions||[];
+  $("#content").innerHTML=head("Universos",currentUser.role==="ADMIN"?"Administración global de universos.":"Universos que administras.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="universeForm()">+ Universo</button>`:"")+`<div class="dataList">${d.universes.map(u=>`<div class="dataRow"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.description||"")} · GM principal: ${esc(u.primaryGMUsername||"—")} · ${u.gmCount} GM(s)</small></div><div><span class="status">${esc(u.status)}</span>${currentUser.role==="ADMIN"?` <button class="btn ghost" onclick="editUniverse('${u.id}')">Editar</button>`:""}</div></div>`).join("")||`<div class="empty">No hay universos disponibles.</div>`}</div>`}
 function drawCharacters(d){$("#content").innerHTML=head("Personajes","Los personajes pertenecen a un universo y no reciben nivel en VROL Core.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:"")+`<div class="dataList">${d.characters.map(c=>`<div class="dataRow"><div class="main"><b>${esc(c.name)}</b><small>Código ${esc(c.characterCode)} · ${esc(c.universeName)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small></div><span class="status">${esc(c.status)}</span></div>`).join("")||`<div class="empty">No hay personajes.</div>`}</div>`}
 function drawTables(d){$("#content").innerHTML=head("Mesas","Cada mesa pertenece a un universo. El acceso es privado.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="tableForm()">+ Mesa</button>`:"")+`<div class="dataList">${d.tables.map(t=>`<div class="dataRow"><div class="main"><b>${esc(t.name)}</b><small>${esc(t.universeName)} · GM ${esc(t.gmUsername)} · ${t.playerCount} jugador(es)</small></div><span class="status">${esc(t.status)}</span></div>`).join("")||`<div class="empty">No hay mesas.</div>`}</div>`}
 function drawSessions(d){$("#content").innerHTML=head("Sesiones","Reuniones temporales pertenecientes a una mesa.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="sessionForm()">+ Sesión</button>`:"")+`<div class="dataList">${d.sessions.map(s=>`<div class="dataRow"><div class="main"><b>${esc(s.title)}</b><small>${esc(s.tableName)} · ${esc(s.moduleTitle||"Sin módulo")} · ${esc(s.startAt)} → ${esc(s.endAt)} · ${esc(s.medium)}</small></div><span class="status">${s.durationMinutes} min</span></div>`).join("")||`<div class="empty">No hay sesiones.</div>`}</div>`}
@@ -101,8 +109,28 @@ function drawAudit(d){$("#content").innerHTML=head("Auditoría","Registro de acc
 function field(label,name,type="text"){return `<label>${label}<input name="${name}" type="${type}" required></label>`}
 function formData(f){return Object.fromEntries(new FormData(f).entries())}
 function userForm(){ $("#content").innerHTML=head("Nuevo usuario","Crea una identidad VROL.")+`<form id="uf" class="formGrid">${field("Usuario","username")}${field("Contraseña","password","password")}<label>Rol<select name="role"><option>PLAYER</option><option>GM</option><option>ADMIN</option></select></label>${field("Player Level 0-100","playerLevel","number")}${field("GM Level 0-100","gmLevel","number")}<div class="full formActions"><button class="btn primary">Crear usuario</button></div></form>`;$("#uf").onsubmit=async e=>{e.preventDefault();try{await api("createUser",formData(e.target));navigate("users")}catch(x){alert(x.message)}}}
-function universeForm(){ $("#content").innerHTML=head("Nuevo universo","Admin puede crear libremente. GM requiere el nivel configurado.")+`<form id="uf" class="formGrid">${field("Nombre","name")}${field("GM principal (username)","primaryGMUsername")}<label class="full">Descripción<textarea name="description"></textarea></label><div class="full formActions"><button class="btn primary">Crear universo</button></div></form>`;$("#uf").onsubmit=async e=>{e.preventDefault();try{await api("createUniverse",formData(e.target));navigate("universes")}catch(x){alert(x.message)}}}
-async function editUniverse(id){const r=await api("getUniverse",{id}),u=r.data;$("#content").innerHTML=head("Administrar universo",esc(u.name))+`<form id="uf" class="formGrid">${field("GM principal (username)","primaryGMUsername")}<label>Estado<select name="status"><option>ACTIVE</option><option>INACTIVE</option></select></label><label class="full">Descripción<textarea name="description">${esc(u.description)}</textarea></label><div class="full formActions"><button class="btn primary">Guardar cambios</button><button type="button" class="btn" onclick="deleteUniverse('${u.id}')">Eliminar</button></div></form>`;$("#uf").elements.primaryGMUsername.value=u.primaryGMUsername||"";$("#uf").elements.status.value=u.status;$("#uf").onsubmit=async e=>{e.preventDefault();await api("updateUniverse",{id,...formData(e.target)});navigate("universes");loadPublic()}}
+function gmOptionsHtml(selected=""){
+  const options=state.universeGMOptions||[];
+  return `<label>GM principal<select name="primaryGMUsername"><option value="">Por definir</option>${options.map(g=>`<option value="${esc(g.username)}" ${String(g.username)===String(selected)?"selected":""}>${esc(g.username)} · GM ${esc(g.gmLevel)}</option>`).join("")}</select></label>`;
+}
+function universeForm(){
+  $("#content").innerHTML=head("Nuevo universo","Admin puede crear libremente. GM requiere el nivel configurado.")+`<form id="uf" class="formGrid">
+  ${field("Nombre","name")}
+  ${gmOptionsHtml()}
+  <label>Imagen del universo (URL)<input name="imageUrl" type="url" placeholder="https://..." ></label>
+  <label class="full">Descripción<textarea name="description"></textarea></label>
+  <div class="full formActions"><button class="btn primary">Crear universo</button></div></form>`;
+  $("#uf").onsubmit=async e=>{e.preventDefault();try{await api("createUniverse",formData(e.target));navigate("universes");loadPublic()}catch(x){alert(x.message)}}}
+async function editUniverse(id){
+  const r=await api("getUniverse",{id}),u=r.data;
+  $("#content").innerHTML=head("Administrar universo",esc(u.name))+`<form id="uf" class="formGrid">
+  ${gmOptionsHtml(u.primaryGMUsername)}
+  <label>Imagen del universo (URL)<input name="imageUrl" type="url" value="${esc(u.imageUrl||"")}" placeholder="https://..." ></label>
+  <label>Estado<select name="status"><option>ACTIVE</option><option>INACTIVE</option></select></label>
+  <label class="full">Descripción<textarea name="description">${esc(u.description||"")}</textarea></label>
+  <div class="full formActions"><button class="btn primary">Guardar cambios</button><button type="button" class="btn" onclick="deleteUniverse('${u.id}')">Eliminar</button></div></form>`;
+  $("#uf").elements.status.value=u.status;
+  $("#uf").onsubmit=async e=>{e.preventDefault();try{await api("updateUniverse",{id,...formData(e.target)});navigate("universes");loadPublic()}catch(x){alert(x.message)}}}
 async function deleteUniverse(id){if(confirm("Se marcará como eliminado y se conservará el registro.")){await api("deleteUniverse",{id});navigate("universes");loadPublic()}}
 function characterForm(){ $("#content").innerHTML=head("Nuevo personaje","El personaje nace dentro de un universo y no tiene nivel VROL Core.")+`<form id="cf" class="formGrid">${field("Nombre","name")}${field("Jugador (username)","playerUsername")}${field("Universo (ID)","universeId")}<label class="full">Descripción<textarea name="description"></textarea></label><div class="full formActions"><button class="btn primary">Crear personaje</button></div></form>`;$("#cf").onsubmit=async e=>{e.preventDefault();try{const r=await api("createCharacter",formData(e.target));alert("Personaje creado. Código: "+r.characterCode);navigate("characters")}catch(x){alert(x.message)}}}
 function tableForm(){ $("#content").innerHTML=head("Nueva mesa","Solo puede crearse dentro de un universo administrado por el GM.") + `<form id="tf" class="formGrid">${field("Nombre","name")}${field("Universo (ID)","universeId")}<label class="full">Descripción<textarea name="description"></textarea></label><div class="full formActions"><button class="btn primary">Crear mesa</button></div></form>`;$("#tf").onsubmit=async e=>{e.preventDefault();try{await api("createTable",formData(e.target));navigate("tables");loadPublic()}catch(x){alert(x.message)}}}
