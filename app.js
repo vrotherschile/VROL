@@ -96,9 +96,9 @@ function drawUniverses(d){
 function drawCharacters(d){
   state.characters=d.characters||[];
   const canEdit=currentUser.role==="ADMIN"||currentUser.role==="GM";
-  $("#content").innerHTML=head("Personajes","Los personajes pertenecen a un universo y no reciben nivel VROL Core.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:"")+
-  `<div class="dataList">${d.characters.map(c=>`<div class="dataRow"><div class="main"><b>${esc(c.name)}</b><small>Código ${esc(c.characterCode)} · ${esc(c.universeName)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small></div><div class="rowActions"><span class="status">${esc(c.status)}</span>${canEdit?`<button class="btn ghost" onclick="editCharacter('${c.id}')">Editar</button>`:""}<button class="btn ghost" onclick='openCharacterSheet(${JSON.stringify(c)})'>Ver ficha</button></div></div>`).join("")||`<div class="empty">No hay personajes.</div>`}</div>`
+  $("#content").innerHTML=head("Personajes","Los personajes pertenecen a un universo y no reciben nivel en VROL Core.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:"")+`<div class="dataList">${d.characters.map(c=>`<div class="dataRow"><div class="main"><b>${esc(c.name)}</b><small>Código ${esc(c.characterCode)} · ${esc(c.universeName)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small></div><div class="rowActions"><span class="status">${esc(c.status)}</span>${canEdit?`<button class="btn ghost" onclick="editCharacter('${c.id}')">Editar</button>`:""}<button class="btn ghost" onclick='openCharacterSheet(${JSON.stringify(c)})'>Ver ficha</button></div></div>`).join("")||`<div class="empty">No hay personajes.</div>`}</div>`
 }
+
 function drawTables(d){$("#content").innerHTML=head("Mesas","Cada mesa pertenece a un universo. El acceso es privado.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="tableForm()">+ Mesa</button>`:"")+`<div class="dataList">${d.tables.map(t=>`<div class="dataRow"><div class="main"><b>${esc(t.name)}</b><small>${esc(t.universeName)} · GM ${esc(t.gmUsername)} · ${t.playerCount} jugador(es)</small></div><span class="status">${esc(t.status)}</span></div>`).join("")||`<div class="empty">No hay mesas.</div>`}</div>`}
 function drawSessions(d){$("#content").innerHTML=head("Sesiones","Reuniones temporales pertenecientes a una mesa.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="sessionForm()">+ Sesión</button>`:"")+`<div class="dataList">${d.sessions.map(s=>`<div class="dataRow"><div class="main"><b>${esc(s.title)}</b><small>${esc(s.tableName)} · ${esc(s.moduleTitle||"Sin módulo")} · ${esc(s.startAt)} → ${esc(s.endAt)} · ${esc(s.medium)}</small></div><span class="status">${s.durationMinutes} min</span></div>`).join("")||`<div class="empty">No hay sesiones.</div>`}</div>`}
 function drawSite(d){
@@ -112,12 +112,11 @@ function drawSite(d){
   `<section class="cmsSection"><div class="sectionHead"><div><h2>Banners · 5 casillas</h2><p class="muted">Cada posición puede activarse, desactivarse o reemplazarse.</p></div></div><div class="cmsGrid">${banners.map(bannerCard).join("")}</div></section>
    <section class="cmsSection"><div class="sectionHead"><div><h2>Videos · 4 casillas</h2><p class="muted">Cada posición puede activarse o dejarse disponible.</p></div></div><div class="cmsGrid">${videos.map(videoCard).join("")}</div></section>
    <section class="cmsSection"><div class="sectionHead"><div><h2>Publicaciones</h2><p class="muted">La publicación principal aparece primero. Puedes ocultar cualquier publicación.</p></div></div><div class="cmsGrid postsGrid">${posts.map(postCard).join("")||`<div class="empty">No hay publicaciones.</div>`}</div>
-   <div class="cmsCard"><div class="cmsSlot">NUEVA PUBLICACIÓN</div><form id="postForm" class="cmsForm">${field("Título","title")}${field("Imagen URL","imageUrl","url")}${field("Destino web","linkUrl","url")}<label>Descripción<textarea name="description"></textarea></label><label>Publicación principal<select name="featured"><option value="false">No</option><option value="true">Sí</option></select></label><div class="formActions"><button class="btn primary">Publicar</button></div></form></div></section>
-   <div class="notice">Los cambios se escriben directamente en Google Sheets mediante Apps Script y se reflejan en el Index al recargar.</div>`;
+   <div class="cmsCard"><div class="cmsSlot">NUEVA PUBLICACIÓN</div><form id="postForm" class="cmsForm">${field("Título","title")}${field("Imagen URL","imageUrl","url")}${field("Destino web","linkUrl","url")}<label>Descripción<textarea name="description"></textarea></label><label>Publicación principal<select name="featured"><option value="false">No</option><option value="true">Sí</option></select></label><div class="formActions"><button class="btn primary">Publicar</button></div></form></div></section>`;
   document.querySelectorAll(".bannerEdit").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("updateBanner",{id:f.dataset.id,...formData(f)});navigate("site")});
   document.querySelectorAll(".videoEdit").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("updateVideo",{id:f.dataset.id,...formData(f)});navigate("site")});
-  document.querySelectorAll(".bannerCreate").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("createBanner",{...formData(f),sortOrder:f.dataset.slot});navigate("site")});
-  document.querySelectorAll(".videoCreate").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("createVideo",{...formData(f),sortOrder:f.dataset.slot});navigate("site")});
+  document.querySelectorAll(".bannerCreate").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("createBanner",{...formData(f)});navigate("site")});
+  document.querySelectorAll(".videoCreate").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("createVideo",{...formData(f)});navigate("site")});
   document.querySelectorAll(".postEdit").forEach(f=>f.onsubmit=async e=>{e.preventDefault();await api("updatePost",{id:f.dataset.id,...formData(f)});navigate("site")});
   $("#postForm").onsubmit=async e=>{e.preventDefault();await api("createPost",formData(e.target));navigate("site")}
 }
@@ -128,7 +127,7 @@ function formData(f){return Object.fromEntries(new FormData(f).entries())}
 function userForm(){ $("#content").innerHTML=head("Nuevo usuario","Crea una identidad VROL.")+`<form id="uf" class="formGrid">${field("Usuario","username")}${field("Contraseña","password","password")}<label>Rol<select name="role"><option>PLAYER</option><option>GM</option><option>ADMIN</option></select></label>${field("Player Level 0-100","playerLevel","number")}${field("GM Level 0-100","gmLevel","number")}<div class="full formActions"><button class="btn primary">Crear usuario</button></div></form>`;$("#uf").onsubmit=async e=>{e.preventDefault();try{await api("createUser",formData(e.target));navigate("users")}catch(x){alert(x.message)}}}
 function gmOptionsHtml(selected=""){
   const options=state.universeGMOptions||[];
-  return `<label>GM principal<select name="primaryGMUsername"><option value="">Por definir</option>${options.map(g=>`<option value="${esc(g.username)}" ${String(g.username)===String(selected)?"selected":""}>${esc(g.username)} · GM ${esc(g.gmLevel)}</option>`).join("")}</select></label>`;
+  return `<label>Responsable principal<select name="primaryGMUsername"><option value="">Por definir</option>${options.map(g=>`<option value="${esc(g.username)}" ${String(g.username)===String(selected)?"selected":""}>${esc(g.username)} · ${esc(g.role||"GM")}${g.role==="GM"?" · Nivel "+esc(g.gmLevel):""}</option>`).join("")}</select></label>`;
 }
 function universeForm(){
   $("#content").innerHTML=head("Nuevo universo","Admin puede crear libremente. GM requiere el nivel configurado.")+`<form id="uf" class="formGrid">
@@ -162,9 +161,9 @@ function characterForm(){
   $("#cf").onsubmit=async e=>{e.preventDefault();try{const r=await api("createCharacter",formData(e.target));alert("Personaje creado. Código: "+r.characterCode);navigate("characters")}catch(x){alert(x.message)}}
 }
 async function editCharacter(id){
-  const r=await api("dashboard",{view:"characters"}), data=r.data, x=(data.characters||[]).find(y=>y.id===id);
+  const r=await api("dashboard",{view:"characters"}),data=r.data,x=(data.characters||[]).find(y=>y.id===id);
   if(!x)return alert("Personaje no encontrado");
-  const players=data.characterPlayers||[], universes=data.characterUniverses||[], canChangeUniverse=currentUser.role==="ADMIN";
+  const players=data.characterPlayers||[],universes=data.characterUniverses||[],canChangeUniverse=currentUser.role==="ADMIN";
   $("#content").innerHTML=head("Editar personaje",esc(x.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+
   `<form id="cf" class="formGrid">
     ${field("Nombre","name")}

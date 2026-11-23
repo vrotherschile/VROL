@@ -56,14 +56,4 @@
   .dicePanel>div:first-child{grid-template-columns:1fr}
 }
 
-.cmsSection{margin-top:24px}
-.cmsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.postsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
-.cmsCard{background:#12171f;border:1px solid #242b35;border-radius:14px;padding:16px}
-.cmsSlot{font-size:11px;letter-spacing:.12em;font-weight:800;color:#8d98a7;margin-bottom:12px}
-.cmsEmpty{padding:16px;background:#0d1117;border:1px dashed #313a47;border-radius:10px;color:#7d8795;margin-bottom:12px}
-.cmsForm{display:grid;gap:9px}
-.cmsForm label{display:grid;gap:5px;color:#aeb7c3;font-size:12px}
-.cmsForm input,.cmsForm textarea,.cmsForm select{width:100%;box-sizing:border-box;background:#0d1117;color:#eef1f5;border:1px solid #303845;border-radius:8px;padding:9px}
-.cmsForm textarea{min-height:80px;resize:vertical}
-@media(max-width:800px){.cmsGrid,.postsGrid{grid-template-columns:1fr}}
+.cmsSection{margin-top:24px}.cmsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.cmsCard{background:#12171f;border:1px solid #242b35;border-radius:14px;padding:16px}.cmsSlot{font-size:11px;letter-spacing:.12em;font-weight:800;color:#8d98a7;margin-bottom:12px}.cmsEmpty{padding:16px;background:#0d1117;border:1px dashed #313a47;border-radius:10px;color:#7d8795;margin-bottom:12px}.cmsForm{display:grid;gap:9px}.cmsForm label{display:grid;gap:5px;color:#aeb7c3;font-size:12px}.cmsForm input,.cmsForm textarea,.cmsForm select{width:100%;box-sizing:border-box;background:#0d1117;color:#eef1f5;border:1px solid #303845;border-radius:8px;padding:9px}.cmsForm textarea{min-height:80px;resize:vertical}@media(max-width:800px){.cmsGrid{grid-template-columns:1fr}}
