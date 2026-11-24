@@ -283,7 +283,7 @@ function characterStatCard(name,obj,specialty="",withSpecialty=false,dataKey="")
 function characterSection(title,items,map,specialties=false,displayNames={}){return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>EXP 0–1000 · 10 EXP por compra</span></div><div class="profileStats">${items.map(n=>characterStatCard(displayNames[n]||n,map?.[n],map?.[n]?.specialty||"",specialties,n)).join("")}</div></section>`}
 function creationExpText(age){
   const a=Math.max(10,Math.min(50,Number(age)||10));
-  const rows={10:10000,20:26000,30:30000,40:32000,50:32000};
+  const rows={10:10000,20:18000,30:24000,40:28000,50:30000};
   const pts=[10,20,30,40,50]; let lo=10,hi=50;
   for(let i=0;i<pts.length;i++){if(pts[i]<=a)lo=pts[i];if(pts[i]>=a){hi=pts[i];break;}}
   const total=lo===hi?rows[lo]:Math.round(rows[lo]+((a-lo)/(hi-lo))*(rows[hi]-rows[lo]));
