@@ -311,3 +311,10 @@ input, textarea, select { overflow-wrap: anywhere; }
   .appShell .elementGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .specialtyOptions .specialtyOption{font-size:8px;padding:4px 6px}
 }
+
+/* ===== Authenticated app page: static shell ===== */
+.appShell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 72px);width:100%;align-items:stretch}
+.appShell .side{min-width:0;min-height:calc(100vh - 72px);height:calc(100vh - 72px);position:sticky;top:72px;overflow-y:auto;overflow-x:hidden}
+.appShell .content{min-width:0;min-height:calc(100vh - 72px);width:100%;overflow:visible}
+@media(max-width:900px){.appShell{grid-template-columns:190px minmax(0,1fr)}}
+@media(max-width:700px){.appShell{display:block;min-height:0}.appShell .side{position:sticky;top:64px;width:100%;height:auto;min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden}.appShell .content{min-height:0;overflow:visible}}

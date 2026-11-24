@@ -77,11 +77,11 @@ function renderShell(){
     : currentUser.role==="GM"
     ? [["dashboard","Inicio"],["universes","Mis universos"],["characters","Personajes"],["tables","Mis mesas"],["sessions","Sesiones"]]
     : [["dashboard","Inicio"],["characters","Mis personajes"],["tables","Mesas"],["sessions","Sesiones"]];
-  const host=$("#appShell");
-  if(!host)return;
-  host.innerHTML=`<div class="panel"><aside class="side"><h3>VROL</h3><div class="user"><b>${esc(currentUser.username)}</b><small>${esc(currentUser.role)} · Player ${currentUser.playerLevel} · GM ${currentUser.gmLevel}</small></div>
+  const side=$("#appSide");
+  if(!side)return;
+  side.innerHTML=`<h3>VROL</h3><div class="user"><b>${esc(currentUser.username)}</b><small>${esc(currentUser.role)} · Player ${currentUser.playerLevel} · GM ${currentUser.gmLevel}</small></div>
   ${menus.map(m=>`<button class="sideBtn" data-view="${m[0]}" onclick="navigate('${m[0]}')">${m[1]}</button>`).join("")}
-  <button class="sideBtn" onclick="logout()">Cerrar sesión</button></aside><main class="content" id="content"></main></div>`;
+  <button class="sideBtn" onclick="logout()">Cerrar sesión</button>`;
   const label=$("#appUserLabel");
   if(label)label.textContent=`${currentUser.username} · ${currentUser.role}`;
 }
@@ -369,7 +369,17 @@ async function logout(){try{await api("logout")}catch(e){}localStorage.removeIte
 
 if($("#authApp")){
   if(!token||!currentUser){window.location.href="index.html";}
-  else{renderShell();const initial=(location.hash||"#dashboard").slice(1)||"dashboard";navigate(initial,false);}
+  else{
+    try{
+      renderShell();
+      const initial=(location.hash||"#dashboard").slice(1)||"dashboard";
+      navigate(initial,false);
+    }catch(err){
+      const content=$("#content");
+      if(content) content.innerHTML=`<div class="notice danger"><b>Error al cargar el panel.</b><br>${esc(err.message||err)}</div>`;
+      console.error("VROL app boot:",err);
+    }
+  }
 }else{
   loadPublic();
 }
