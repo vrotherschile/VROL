@@ -1,12 +1,13 @@
 const DEFAULT_API="https://script.google.com/macros/s/AKfycbx0N2kVzt6DZK4Nofz9T--JuaqLzKODr4i6i0zUm9IWikxJUCuXtElXqcBjv7JCrAOC/exec";
 const API=String(localStorage.getItem("VROL_API")||DEFAULT_API).trim();
 let token=localStorage.getItem("VROL_TOKEN")||"", currentUser=null, state={};
+try{currentUser=JSON.parse(localStorage.getItem("VROL_USER")||"null")}catch(e){currentUser=null}
 
 const $=s=>document.querySelector(s);
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function showLogin(){$("#loginModal").classList.remove("hidden");$("#loginUser").focus()}
 function hideLogin(){$("#loginModal").classList.add("hidden")}
-function closePanel(){$("#panelModal").classList.add("hidden")}
+function closePanel(){window.location.href="index.html"}
 async function api(action,data={}){
   if(API.includes("PEGAR_URL")) throw new Error("Configura la URL /exec de Apps Script en app.js.");
   const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,...data,token})});
@@ -62,25 +63,32 @@ function youtubeId(url){const m=String(url||"").match(/(?:youtu\.be\/|youtube\.c
 $("#loginForm").addEventListener("submit",async e=>{
   e.preventDefault();$("#loginError").textContent="";
   try{const r=await api("login",{username:$("#loginUser").value.trim(),password:$("#loginPass").value});
-    token=r.token;currentUser=r.user;localStorage.setItem("VROL_TOKEN",token);hideLogin();openPanel();
+    token=r.token;currentUser=r.user;localStorage.setItem("VROL_TOKEN",token);localStorage.setItem("VROL_USER",JSON.stringify(currentUser));hideLogin();openPanel();
   }catch(x){$("#loginError").textContent=x.message}
 });
 
-function openPanel(){ $("#panelModal").classList.remove("hidden"); renderShell(); navigate("dashboard"); }
+function openPanel(){ window.location.href="app.html#dashboard"; }
 function renderShell(){
   const menus=currentUser.role==="ADMIN"
     ? [["dashboard","Inicio"],["users","Usuarios"],["universes","Universos"],["characters","Personajes"],["tables","Mesas"],["sessions","Sesiones"],["site","Index / CMS"],["settings","Configuración"],["audit","Auditoría"]]
     : currentUser.role==="GM"
     ? [["dashboard","Inicio"],["universes","Mis universos"],["characters","Personajes"],["tables","Mis mesas"],["sessions","Sesiones"]]
     : [["dashboard","Inicio"],["characters","Mis personajes"],["tables","Mesas"],["sessions","Sesiones"]];
-  $("#panel").innerHTML=`<div class="panel"><aside class="side"><h3>VROL</h3><div class="user"><b>${esc(currentUser.username)}</b><small>${esc(currentUser.role)} · Player ${currentUser.playerLevel} · GM ${currentUser.gmLevel}</small></div>
+  const host=$("#appShell");
+  if(!host)return;
+  host.innerHTML=`<div class="panel"><aside class="side"><h3>VROL</h3><div class="user"><b>${esc(currentUser.username)}</b><small>${esc(currentUser.role)} · Player ${currentUser.playerLevel} · GM ${currentUser.gmLevel}</small></div>
   ${menus.map(m=>`<button class="sideBtn" data-view="${m[0]}" onclick="navigate('${m[0]}')">${m[1]}</button>`).join("")}
   <button class="sideBtn" onclick="logout()">Cerrar sesión</button></aside><main class="content" id="content"></main></div>`;
+  const label=$("#appUserLabel");
+  if(label)label.textContent=`${currentUser.username} · ${currentUser.role}`;
 }
-async function navigate(view){
+async function navigate(view,updateHash=true){
   document.querySelectorAll(".sideBtn").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
-  $("#content").innerHTML=`<div class="notice">Cargando...</div>`;
-  try{const r=await api("dashboard",{view});state=r.data;draw(view,r.data)}catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
+  if(updateHash && location.hash!==`#${view}`)history.replaceState(null,"",`#${view}`);
+  const content=$("#content");
+  if(!content)return;
+  content.innerHTML=`<div class="notice">Cargando...</div>`;
+  try{const r=await api("dashboard",{view});state=r.data;draw(view,r.data)}catch(e){content.innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
 function head(title,sub,button=""){return `<div class="contentHeader"><div><h1>${title}</h1><p class="muted">${sub}</p></div>${button}</div>`}
 function draw(view,d){
@@ -228,12 +236,14 @@ function domainBase(exp){
   return {exp:n,domain:Math.round(n/10),base:n===0?0:Math.min(10,Math.ceil(n/100))};
 }
 function domainBar(domain){return `<div class="domainBar"><span style="width:${Math.max(0,Math.min(100,Number(domain)||0))}%"></span></div>`}
-function profileStatRow(name,obj){
+function profileStatRow(name,obj,profile,withSpecialty=false){
   const v=obj||domainBase(0);
-  return `<div class="profileStat"><div class="profileStatName">${esc(name)}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span></div>${domainBar(v.domain)}</div>`;
+  const specialtyOptions=withSpecialty?(CHARACTER_SPECIALTIES[name]||[]).map(s=>`<button type="button" class="specialtyOption ${profile.specialties?.[name]===s?"selected":""}" onclick='selectCharacterSpecialty(${JSON.stringify(profile.__character)},${JSON.stringify(name)},${JSON.stringify(s)})'>${esc(s)}</button>`).join(""):"";
+  return `<div class="profileStat"><div class="profileStatName">${esc(name)}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span></div>${domainBar(v.domain)}${withSpecialty?`<div class="inlineSpecialties"><span>Especialidad</span><div class="specialtyOptions">${specialtyOptions}</div></div>`:""}</div>`;
 }
-function profileSection(title, items, profile, key){
-  return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>EXP 0–1000</span></div><div class="profileStats">${items.map(n=>profileStatRow(n,profile[key]?.[n])).join("")}</div></section>`;
+function profileSection(title, items, profile, key, withSpecialty=false, character=null){
+  const scopedProfile=withSpecialty?{...profile,__character:character}:profile;
+  return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>${withSpecialty?"EXP 0–1000 · Especialidad":"EXP 0–1000"}</span></div><div class="profileStats">${items.map(n=>profileStatRow(n,profile[key]?.[n],scopedProfile,withSpecialty)).join("")}</div></section>`;
 }
 function calcCharacterDerived(profile){
   const r=profile.traits||{};
@@ -264,9 +274,9 @@ function openCharacterSheet(c){
       <div class="derivedCard"><span>Energía máxima</span><b>${d.energy}</b><small>EXP Energía: ${Number(p.energyExp||0)} / 1000</small></div>
     </div>
     ${profileSection("Rasgos Principales",CHARACTER_TRAITS,p,"traits")}
-    ${profileSection("Técnicas y Talentos de Combate",CHARACTER_CAPACITIES.slice(0,8),p,"capacities")}
-    ${profileSection("Conocimientos Principales",CHARACTER_CAPACITIES.slice(8),p,"capacities")}
-    <section class="profileSection"><div class="profileSectionHead"><h3>Especialidades</h3><span>4 por capacidad</span></div><div class="specialtyGrid">${CHARACTER_CAPACITIES.map(k=>`<div class="specialtyBox"><b>${esc(k)}</b><div>${CHARACTER_SPECIALTIES[k].map(s=>`<button class="specialtyOption ${p.specialties?.[k]===s?"selected":""}" onclick='selectCharacterSpecialty(${JSON.stringify(c)},${JSON.stringify(k)},${JSON.stringify(s)})'>${esc(s)}</button>`).join("")}</div></div>`).join("")}</div></section>
+    ${profileSection("Técnicas y Talentos de Combate",CHARACTER_CAPACITIES.slice(0,8),p,"capacities",true,c)}
+    ${profileSection("Conocimientos Principales",CHARACTER_CAPACITIES.slice(8),p,"capacities",true,c)}
+
     ${profileSection("Árbol de Energía",CHARACTER_TREE,p,"tree")}
     <section class="profileSection"><div class="profileSectionHead"><h3>Elementos / Dones</h3><span>10 dimensiones</span></div><div class="elementGrid">${CHARACTER_ELEMENTS.map(n=>`<div class="elementCard"><span>${esc(n)}</span><b>${p.elements?.[n]?.base||0}</b><small>${p.elements?.[n]?.domain||0}%</small></div>`).join("")}</div></section>
     <section class="profileSection"><div class="profileSectionHead"><h3>Dados</h3><span>Visual de tiradas</span></div>
@@ -352,5 +362,11 @@ async function sessionForm(){
     };
   }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
-async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");token="";currentUser=null;closePanel()}
-loadPublic();
+async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");localStorage.removeItem("VROL_USER");token="";currentUser=null;window.location.href="index.html"}
+
+if($("#authApp")){
+  if(!token||!currentUser){window.location.href="index.html";}
+  else{renderShell();const initial=(location.hash||"#dashboard").slice(1)||"dashboard";navigate(initial,false);}
+}else{
+  loadPublic();
+}

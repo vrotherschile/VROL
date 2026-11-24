@@ -246,3 +246,68 @@ input, textarea, select { overflow-wrap: anywhere; }
 
 /* Prevent card grids from creating an invisible minimum width on very narrow screens. */
 .cards { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+
+/* ===== VROL authenticated subpage ===== */
+.appBody{min-height:100vh;background:#080a0e;overflow-x:hidden}
+.appPage{min-height:100vh;background:#080a0e;color:#eef1f5}
+.appTopbar{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid #202630;background:#0b0e13;position:sticky;top:0;z-index:20}
+.appLogo{display:flex;align-items:center;gap:12px}
+.appLogo span{font-size:21px;font-weight:900;letter-spacing:.2em}
+.appLogo small{font-size:8px;letter-spacing:.15em;color:#737d8c;max-width:210px;line-height:1.35}
+.appTopActions{display:flex;align-items:center;gap:12px}
+.appUserLabel{font-size:11px;color:#8d97a6}
+.appShell{min-height:calc(100vh - 72px);width:100%;display:grid;grid-template-columns:240px minmax(0,1fr);align-items:start}
+.appShell .panel{width:100%;min-width:0;min-height:calc(100vh - 72px);display:grid;grid-template-columns:240px minmax(0,1fr)}
+.appShell .side{position:sticky;top:72px;height:calc(100vh - 72px);min-width:0;overflow-y:auto;overflow-x:hidden;background:#0a0d12;border-right:1px solid #232a33;padding:24px 14px}
+.appShell .content{min-width:0;width:100%;padding:38px clamp(20px,4vw,52px) 60px;overflow:visible}
+.appShell .contentHeader{min-width:0}
+.appShell .contentHeader>div{min-width:0}
+.appShell .content h1{font-size:32px}
+.appShell .profileStats{min-width:0}
+.appShell .profileStat{min-width:0}
+.appShell .dataRow{min-width:0}
+.appShell .cmsGrid{min-width:0}
+
+/* Talents/knowledge: specialty stays inside the same grid cell. */
+.inlineSpecialties{margin-top:11px;padding-top:9px;border-top:1px solid #202631}
+.inlineSpecialties>span{display:block;color:#697482;font-size:8px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.specialtyOptions{display:flex;flex-wrap:wrap;gap:5px}
+.specialtyOptions .specialtyOption{border:1px solid #303844;background:#11161d;color:#8f99a7;border-radius:6px;padding:5px 7px;font-size:9px;line-height:1.2}
+.specialtyOptions .specialtyOption:hover{border-color:#697483;color:#eef1f5}
+.specialtyOptions .specialtyOption.selected{background:#e9edf2;color:#090b0e;border-color:#e9edf2;font-weight:700}
+
+@media(max-width:900px){
+  .appShell,.appShell .panel{grid-template-columns:190px minmax(0,1fr)}
+  .appShell .side{padding:20px 10px}
+  .appShell .content{padding:30px 24px 50px}
+}
+@media(max-width:700px){
+  .appTopbar{height:auto;min-height:64px;padding:12px 16px;gap:10px}
+  .appLogo small{display:none}
+  .appUserLabel{display:none}
+  .appShell,.appShell .panel{display:block;min-height:0}
+  .appShell .side{position:sticky;top:64px;width:100%;height:auto;max-height:none;overflow-x:auto;overflow-y:hidden;display:flex;align-items:center;gap:4px;padding:10px 8px;border-right:0;border-bottom:1px solid #232a33;z-index:10;white-space:nowrap}
+  .appShell .side h3,.appShell .side .user{display:none}
+  .appShell .sideBtn{width:auto;min-width:max-content;display:inline-flex;white-space:nowrap}
+  .appShell .content{padding:24px 16px 45px;overflow:visible}
+  .appShell .contentHeader{flex-direction:column;align-items:stretch}
+  .appShell .contentHeader>.btn{align-self:flex-start}
+  .appShell .dataRow{align-items:flex-start;flex-direction:column}
+  .appShell .dataRow .rowActions{width:100%}
+  .appShell .formActions{flex-wrap:wrap}
+  .appShell .profileHero{grid-template-columns:120px minmax(0,1fr)}
+  .appShell .profilePortrait{width:120px}
+  .appShell .profileStats{grid-template-columns:1fr}
+  .appShell .derivedGrid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .appTopbar{padding:10px 12px}
+  .appLogo span{font-size:18px}
+  .appTopActions .btn{padding:8px 11px;font-size:11px}
+  .appShell .content{padding:20px 12px 40px}
+  .appShell .content h1{font-size:26px}
+  .appShell .profileHero{grid-template-columns:1fr}
+  .appShell .profilePortrait{width:110px}
+  .appShell .elementGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .specialtyOptions .specialtyOption{font-size:8px;padding:4px 6px}
+}
