@@ -364,3 +364,17 @@ input, textarea, select { overflow-wrap: anywhere; }
 @media(max-width:700px){.skillRow{grid-template-columns:1fr}.advancedSkillRow{grid-template-columns:1fr}.participantChoice{min-width:0}}
 
 .adminDirectCard .adminXpGrid{margin-top:12px}
+
+/* VROL — límites genéticos y valores derivados */
+.limitGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:14px}
+.limitGrid>div{min-width:0}
+.limitGrid h4{margin:0 0 10px;font-size:.95rem}
+.limitChips{display:flex;flex-wrap:wrap;gap:7px}
+.limitRow{margin-bottom:6px}
+.limitRow small{display:block;opacity:.65;font-size:.72rem}
+.domainBar{height:6px;border-radius:999px;overflow:hidden;margin-top:6px;background:rgba(255,255,255,.08)}
+.domainBar span{display:block;height:100%;background:currentColor;opacity:.8}
+@media(max-width:900px){.limitGrid{grid-template-columns:1fr}}
+
+/* VROL V1.1 · Técnicas, tiradas rápidas y personalización */
+.quickRollCard{display:flex;justify-content:space-between;align-items:center;gap:18px;background:#12171f;border:1px solid #2a3440;border-radius:14px;padding:18px;margin-bottom:18px}.quickRollCard h3{margin:8px 0 3px}.quickRollControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.quickRollControls input{min-width:150px;background:#090c11;border:1px solid #2d3540;color:#fff;border-radius:7px;padding:11px}.quickRollControls b{font-size:20px;min-width:180px;text-align:center}.techniqueList{display:grid;gap:10px}.techniqueCard{display:flex;justify-content:space-between;gap:18px;align-items:center;background:#0d1117;border:1px solid #252d37;border-radius:11px;padding:15px}.techniqueCard h4{margin:7px 0}.techniqueCard p{margin:5px 0;color:#8893a1}.techniqueCard small{color:#6f7a89}.techniqueActions{display:flex;align-items:center;gap:8px;white-space:nowrap}.techEffectRow{display:grid;grid-template-columns:1fr 1.3fr 1fr .65fr;gap:10px;background:#0d1117;border:1px solid #252d37;border-radius:9px;padding:10px;margin-bottom:8px}.techEffectRow label{margin:0}.appShell .profileSection{min-width:0}.appShell .techniqueCard{min-width:0}.appShell .techniqueCard>div:first-child{min-width:0}@media(max-width:800px){.quickRollCard{display:block}.quickRollControls{margin-top:12px}.techniqueCard{display:block}.techniqueActions{margin-top:12px}.techEffectRow{grid-template-columns:1fr}}
