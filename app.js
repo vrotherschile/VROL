@@ -111,12 +111,15 @@ function drawUniverses(d){
   $("#content").innerHTML=head("Universos",currentUser.role==="ADMIN"?"Administración global de universos.":"Universos que administras.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="universeForm()">+ Universo</button>`:"")+`<div class="dataList">${d.universes.map(u=>`<div class="dataRow"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.description||"")} · GM principal: ${esc(u.primaryGMUsername||"—")} · ${u.gmCount} GM(s)</small></div><div><span class="status">${esc(u.status)}</span>${currentUser.role==="ADMIN"?` <button class="btn ghost" onclick="editUniverse('${u.id}')">Editar</button>`:""}</div></div>`).join("")||`<div class="empty">No hay universos disponibles.</div>`}</div>`}
 function drawCharacters(d){
   state.characters=d.characters||[];
+  state.characterConfig=d.characterConfig||state.characterConfig||{};
   const canEdit=currentUser.role==="ADMIN"||currentUser.role==="GM";
-  $("#content").innerHTML=head("Personajes","Los personajes pertenecen a un universo y no reciben nivel en VROL Core.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:"")+`<div class="dataList">${d.characters.map(c=>`<div class="dataRow"><div class="main"><b>${esc(c.name)}</b><small>Código ${esc(c.characterCode)} · ${esc(c.universeName)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small></div><div class="rowActions"><span class="status">${esc(c.status)}</span>${canEdit?`<button class="btn ghost" onclick="editCharacter('${c.id}')">Editar</button>`:""}<button class="btn ghost" onclick='openCharacterSheet(${JSON.stringify(c)})'>Ver ficha</button></div></div>`).join("")||`<div class="empty">No hay personajes.</div>`}</div>`
+  const createBtns=currentUser.role==="ADMIN"?`<button class="btn ghost" onclick="advancedCharacterForm()">+ Personaje avanzado</button> <button class="btn primary" onclick="characterForm()">+ Personaje</button>`:currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:"";
+  $("#content").innerHTML=head("Personajes","Los personajes pertenecen a un universo y su ficha se edita desde el sistema de personaje.",createBtns)+`<div class="dataList">${d.characters.map(c=>`<div class="dataRow"><div class="main"><b>${esc(c.name)}</b><small>Código ${esc(c.characterCode)} · ${esc(c.universeName)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small></div><div class="rowActions"><span class="status">${esc(c.status)}</span>${canEdit?`<button class="btn ghost" onclick="editCharacter('${c.id}')">Editar</button>`:""}<button class="btn ghost" onclick="characterEditor('${c.id}')">Editar ficha</button><button class="btn ghost" onclick='openCharacterSheet(${JSON.stringify(c)})'>Ver ficha</button></div></div>`).join("")||`<div class="empty">No hay personajes.</div>`}</div>`
 }
 
 function drawTables(d){$("#content").innerHTML=head("Mesas","Cada mesa pertenece a un universo. El acceso es privado.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="tableForm()">+ Mesa</button>`:"")+`<div class="dataList">${d.tables.map(t=>`<div class="dataRow"><div class="main"><b>${esc(t.name)}</b><small>${esc(t.universeName)} · GM ${esc(t.gmUsername)} · ${t.playerCount} jugador(es)</small></div><span class="status">${esc(t.status)}</span></div>`).join("")||`<div class="empty">No hay mesas.</div>`}</div>`}
-function drawSessions(d){$("#content").innerHTML=head("Sesiones","Reuniones temporales pertenecientes a una mesa.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="sessionForm()">+ Sesión</button>`:"")+`<div class="dataList">${d.sessions.map(s=>`<div class="dataRow"><div class="main"><b>${esc(s.title)}</b><small>${esc(s.tableName)} · ${esc(s.moduleTitle||"Sin módulo")} · ${esc(s.startAt)} → ${esc(s.endAt)} · ${esc(s.medium)}</small></div><span class="status">${s.durationMinutes} min</span></div>`).join("")||`<div class="empty">No hay sesiones.</div>`}</div>`}
+function drawSessions(d){$("#content").innerHTML=head("Sesiones","Reuniones temporales pertenecientes a una mesa. Al cerrar una sesión, el GM asigna la misma EXP a cada personaje participante.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="sessionForm()">+ Sesión</button>`:"")+`<div class="dataList">${d.sessions.map(s=>`<div class="dataRow"><div class="main"><b>${esc(s.title)}</b><small>${esc(s.tableName)} · ${esc(s.moduleTitle||"Sin módulo")} · ${esc(s.startAt)} → ${esc(s.endAt)} · ${esc(s.medium)}</small></div><div class="rowActions"><span class="status">${String(s.status||"OPEN")==="CLOSED"?"CERRADA":(s.durationMinutes+" min")}</span>${currentUser.role!=="PLAYER"&&String(s.status||"OPEN")!=="CLOSED"?`<button class="btn ghost" onclick="closeSessionUI('${s.id}')">Cerrar y asignar EXP</button>`:""}</div></div>`).join("")||`<div class="empty">No hay sesiones.</div>`}</div>`} 
+function closeSessionUI(id){const raw=prompt("EXP que recibirá cada personaje participante. Debe ser múltiplo de 10:","100");if(raw===null)return;const xp=Number(raw);if(!xp||xp%10!==0){alert("La EXP debe ser un número mayor que 0 y múltiplo de 10.");return}(async()=>{try{const r=await api("closeSession",{id,xpAward:xp});alert(`Sesión cerrada. ${r.charactersAwarded} personaje(s) recibieron ${r.xpPerCharacter} EXP.`);navigate("sessions")}catch(e){alert(e.message)}})()}
 function drawSite(d){
   const banners=Array.from({length:5},(_,i)=>d.banners.find(x=>Number(x.sortOrder)===i+1)||null);
   const videos=Array.from({length:4},(_,i)=>d.videos.find(x=>Number(x.sortOrder)===i+1)||null);
@@ -169,13 +172,28 @@ function characterForm(){
   $("#content").innerHTML=head("Nuevo personaje","El personaje nace dentro de un universo y no tiene nivel VROL Core.")+
   `<form id="cf" class="formGrid">
     ${field("Nombre","name")}
+    <label>Edad inicial<select name="age" required>${Array.from({length:31},(_,i)=>i+10).map(a=>`<option value="${a}">${a} años · ${creationExpText(a)} EXP</option>`).join("")}</select></label>
     <label>Jugador<select name="playerUsername" required><option value="">Seleccionar jugador...</option>${players.map(p=>`<option value="${esc(p.username)}">${esc(p.username)}</option>`).join("")}</select></label>
     <label>Universo<select name="universeId" required><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("")}</select></label>
     <label class="full">Descripción<textarea name="description"></textarea></label>
     <div class="full formActions"><button class="btn primary">Crear personaje</button></div>
   </form>`;
-  $("#cf").onsubmit=async e=>{e.preventDefault();try{const r=await api("createCharacter",formData(e.target));alert("Personaje creado. Código: "+r.characterCode);navigate("characters")}catch(x){alert(x.message)}}
+  $("#cf").onsubmit=async e=>{e.preventDefault();try{const r=await api("createCharacter",formData(e.target));alert("Personaje creado. Código: "+r.characterCode+" · EXP inicial: "+Number(r.creationExp||0).toLocaleString("es-CL"));characterEditor(r.id)}catch(x){alert(x.message)}}
 }
+async function advancedCharacterForm(){
+  if(currentUser.role!=="ADMIN")return alert("Solo ADMIN puede usar el creador avanzado.");
+  const players=state.characterPlayers||[],universes=state.characterUniverses||[];
+  const groups=[['core',['Salud','Energía',...CHARACTER_TRAITS]],['talents',CHARACTER_CAPACITIES.slice(0,8)],['knowledge',CHARACTER_CAPACITIES.slice(8)],['tree',CHARACTER_TREE],['elements',CHARACTER_ELEMENTS]];
+  const rows=groups.flatMap(([cat,names])=>names.map(name=>`<label class="adminXpRow"><span>${esc(name)}<small>${esc(categoryLabel(cat))}</small></span><input class="adminXpInput" data-cat="${cat}" data-target="${esc(name)}" type="number" min="0" max="1000" step="10" value="0"></label>`)).join('');
+  $("#content").innerHTML=head("Creador avanzado","ADMIN · creación sin entrevista y sin límite global de EXP.",`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`<section class="editorCard adminAdvancedCard"><div class="profileSectionHead"><h3>Creación administrativa</h3><span>Máximo 1.000 EXP por objetivo · sin límite global</span></div><div class="formGrid compact"><label>Nombre<input id="advName"></label><label>Edad inicial<select id="advAge">${Array.from({length:31},(_,i)=>i+10).map(a=>`<option value="${a}">${a} años</option>`).join('')}</select></label><label>Jugador<select id="advPlayer"><option value="">Seleccionar jugador...</option>${players.map(p=>`<option value="${esc(p.username)}">${esc(p.username)}</option>`).join('')}</select></label><label>Universo<select id="advUniverse"><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')}</select></label><label class="full">Descripción<textarea id="advDescription"></textarea></label></div><div class="xpCounterCard"><span>EXP total asignada</span><strong id="advXpTotal">0 EXP</strong><small>Se actualiza mientras asignas EXP.</small></div><div class="adminXpGrid">${rows}</div><section class="profileSection"><div class="profileSectionHead"><h3>Habilidades avanzadas</h3><span>Puede crear habilidades personalizadas</span></div><div id="advSkills"></div><button type="button" class="btn" onclick="addAdvancedSkillRow()">+ Habilidad</button></section><div class="formActions"><button class="btn primary" onclick="submitAdvancedCharacter()">Crear personaje avanzado</button></div></section>`;
+  document.querySelectorAll('.adminXpInput').forEach(el=>el.addEventListener('input',updateAdvancedXpTotal));
+}
+function addAdvancedSkillRow(){
+  const box=$("#advSkills");if(!box)return;const i=box.children.length;const row=document.createElement("div");row.className="formGrid compact advancedSkillRow";row.innerHTML=`<label>Habilidad ${i+1}<input class="advSkillName" placeholder="Nombre"></label><label>EXP<input class="advSkillExp" type="number" min="0" max="1000" step="10" value="0"></label><button type="button" class="btn ghost" onclick="this.parentElement.remove();updateAdvancedXpTotal()">Quitar</button>`;box.appendChild(row);}
+
+function updateAdvancedXpTotal(){let total=0;document.querySelectorAll('.adminXpInput').forEach(el=>{let n=Math.max(0,Math.min(1000,Math.round(Number(el.value||0)/10)*10));el.value=n;total+=n;});document.querySelectorAll('.advSkillExp').forEach(el=>{let n=Math.max(0,Math.min(1000,Math.round(Number(el.value||0)/10)*10));el.value=n;total+=n;});const out=$("#advXpTotal");if(out)out.textContent=total.toLocaleString('es-CL')+' EXP';}
+function submitAdvancedCharacter(){const allocations={core:{},talents:{},knowledge:{},tree:{},elements:{},skills:{}};document.querySelectorAll('.adminXpInput').forEach(el=>allocations[el.dataset.cat][el.dataset.target]=Math.max(0,Math.min(1000,Math.round(Number(el.value||0)/10)*10)));const advancedSkills=[...document.querySelectorAll('.advancedSkillRow')].map(r=>({name:r.querySelector('.advSkillName')?.value.trim(),exp:Math.max(0,Math.min(1000,Math.round(Number(r.querySelector('.advSkillExp')?.value||0)/10)*10))})).filter(x=>x.name);const payload={name:$("#advName").value.trim(),age:Number($("#advAge").value),playerUsername:$("#advPlayer").value,universeId:$("#advUniverse").value,description:$("#advDescription").value,allocations,advancedSkills};if(!payload.name||!payload.playerUsername||!payload.universeId)return alert('Completa nombre, jugador y universo.');(async()=>{try{const r=await api('createAdvancedCharacter',payload);alert(`Personaje avanzado creado. Código: ${r.characterCode} · EXP asignada: ${Number(r.totalSpent||0).toLocaleString('es-CL')}`);navigate('characters');}catch(e){alert(e.message)}})();}
+
 async function editCharacter(id){
   const r=await api("dashboard",{view:"characters"}),data=r.data,x=(data.characters||[]).find(y=>y.id===id);
   if(!x)return alert("Personaje no encontrado");
@@ -215,109 +233,88 @@ const CHARACTER_SPECIALTIES={
 const CHARACTER_TREE=["Poder","Forma","Cantidad","Rapidez","Distancia","Efecto"];
 const CHARACTER_ELEMENTS=["Material","Inmaterial","Especial","Mixto","Liberado","Agua","Fuego","Rayo","Tierra","Viento"];
 
-function charStorageKey(c){return "VROL_CHARACTER_PROFILE_"+String(c.id||c.characterCode||c.name)}
-function defaultCharacterProfile(c){
-  const blank=()=>({exp:0,domain:0,base:0});
-  return {
-    identity:{name:c.name||"",age:c.age||"",rank:c.rank||"",history:c.history||"",imageUrl:c.imageUrl||""},
-    traits:Object.fromEntries(CHARACTER_TRAITS.map(x=>[x,blank()])),
-    capacities:Object.fromEntries(CHARACTER_CAPACITIES.map(x=>[x,blank()])),
-    specialties:{},
-    tree:Object.fromEntries(CHARACTER_TREE.map(x=>[x,blank()])),
-    elements:Object.fromEntries(CHARACTER_ELEMENTS.map(x=>[x,blank()])),
-    healthExp:0, energyExp:0
-  };
-}
-function getCharacterProfile(c){
-  try{
-    const saved=JSON.parse(localStorage.getItem(charStorageKey(c))||"null");
-    return saved||defaultCharacterProfile(c);
-  }catch(e){return defaultCharacterProfile(c)}
-}
-function domainBase(exp){
-  const n=Math.max(0,Math.min(1000,Number(exp)||0));
-  return {exp:n,domain:Math.round(n/10),base:n===0?0:Math.min(10,Math.ceil(n/100))};
-}
+function expView(exp){const n=Math.max(0,Math.min(1000,Number(exp)||0));return {exp:n,domain:Math.round(n/10),base:n===0?0:Math.min(10,Math.ceil(n/100))};}
 function domainBar(domain){return `<div class="domainBar"><span style="width:${Math.max(0,Math.min(100,Number(domain)||0))}%"></span></div>`}
-function profileStatRow(name,obj,profile,withSpecialty=false){
-  const v=obj||domainBase(0);
-  const specialtyOptions=withSpecialty?(CHARACTER_SPECIALTIES[name]||[]).map(s=>`<button type="button" class="specialtyOption ${profile.specialties?.[name]===s?"selected":""}" onclick='selectCharacterSpecialty(${JSON.stringify(profile.__character)},${JSON.stringify(name)},${JSON.stringify(s)})'>${esc(s)}</button>`).join(""):"";
-  return `<div class="profileStat"><div class="profileStatName">${esc(name)}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span></div>${domainBar(v.domain)}${withSpecialty?`<div class="inlineSpecialties"><span>Especialidad</span><div class="specialtyOptions">${specialtyOptions}</div></div>`:""}</div>`;
+function characterStatCard(name,obj,specialty="",withSpecialty=false){
+  const v=expView(obj?.exp||0);
+  return `<div class="profileStat"><div class="profileStatName">${esc(name)}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span></div>${domainBar(v.domain)}${withSpecialty?`<div class="inlineSpecialties"><span>Especialidad</span><select class="specialtySelect" data-capacity="${esc(name)}"><option value="">Sin especialidad</option>${(CHARACTER_SPECIALTIES[name]||[]).map(x=>`<option ${String(x)===String(specialty)?"selected":""}>${esc(x)}</option>`).join("")}</select></div>`:""}</div>`;
 }
-function profileSection(title, items, profile, key, withSpecialty=false, character=null){
-  const scopedProfile=withSpecialty?{...profile,__character:character}:profile;
-  return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>${withSpecialty?"EXP 0–1000 · Especialidad":"EXP 0–1000"}</span></div><div class="profileStats">${items.map(n=>profileStatRow(n,profile[key]?.[n],scopedProfile,withSpecialty)).join("")}</div></section>`;
+function characterSection(title,items,map,specialties=false){return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>EXP 0–1000 · 10 EXP por compra</span></div><div class="profileStats">${items.map(n=>characterStatCard(n,map?.[n],map?.[n]?.specialty||"",specialties)).join("")}</div></section>`}
+function creationExpText(age){
+  const a=Math.max(10,Math.min(40,Number(age)||10));
+  const total=5000+Math.min(Math.max(a-10,0),10)*450+Math.min(Math.max(a-20,0),10)*400+Math.min(Math.max(a-30,0),10)*350;
+  return total.toLocaleString("es-CL");
 }
-function calcCharacterDerived(profile){
-  const r=profile.traits||{};
-  const resistencia=r["Resistencia"]?.base||0;
-  const aura=r["Aura"]?.base||0;
-  const voluntad=r["Voluntad"]?.base||0;
-  const health=Math.round(resistencia*aura*(Number(profile.healthExp||0)/100));
-  const energy=Math.round(voluntad*aura*(Number(profile.energyExp||0)/100));
-  return {health,energy};
+function categoryLabel(k){return ({core:"Salud / Energía / Rasgos Principales",talents:"Talentos",knowledge:"Conocimientos",tree:"Árbol de Energía",elements:"Elementos / Dones",skills:"Habilidades"})[k]||k}
+function characterEditor(id){
+  (async()=>{
+    try{
+      const r=await api("getCharacterProfile",{id});
+      const d=r.data, p=d.profile, c=d.character;
+      const cfg=state.characterConfig||{};
+      const interview=cfg.interview||[];
+      const canAdmin=currentUser.role==="ADMIN";
+      let html=head("Editar ficha de personaje",esc(c.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`);
+      html+=`<div class="characterEditor">
+        <section class="editorCard"><div class="profileSectionHead"><h3>Identidad</h3><span>${p.creationComplete?"Creación completada":"Configuración inicial"}</span></div>
+          <div class="formGrid compact"><label>Nombre<input id="ceName" value="${esc(c.name||"")}"></label>
+          <label>Edad inicial<select id="ceAge" ${p.creationComplete&&!canAdmin?"disabled":""}>${Array.from({length:31},(_,i)=>i+10).map(a=>`<option value="${a}" ${a===p.age?"selected":""}>${a} años</option>`).join("")}</select><small class="muted">Experiencia de creación: <b id="creationExpPreview">${Number(p.creationExp||0).toLocaleString("es-CL")}</b> EXP</small></label>
+          <label class="full">Descripción<textarea id="ceDescription">${esc(c.description||"")}</textarea></label></div>
+          <div class="formActions"><button class="btn primary" onclick="saveCharacterIdentity('${c.id}')">Guardar identidad</button></div>
+        </section>`;
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Experiencia Disponible</h3><span>EXP ganada: ${Number(p.experienceEarned||0).toLocaleString("es-CL")}</span></div><div class="xpHero"><strong>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</strong><span>EXP Disponible</span></div><div class="xpPools">${Object.entries(d.categoryPools||{}).map(([k,v])=>`<div class="xpPool"><b>${esc(categoryLabel(k))}</b><span>${v.remaining.toLocaleString("es-CL")} / ${v.pool.toLocaleString("es-CL")}</span><small>${Math.round(((v.pool-v.remaining)/(v.pool||1))*100)}% utilizado</small></div>`).join("")}</div></section>`;
+      if(!p.creationComplete){
+        html+=`<section class="editorCard interviewCard"><div class="profileSectionHead"><h3>Entrevista de Seiran</h3><span>Asignación inicial de EXP</span></div><p class="muted">El Príncipe Seiran te recibe como guerrero llegado desde otro universo. Tus respuestas determinan cómo se distribuye la experiencia inicial. La edad define el presupuesto total.</p><div id="interviewForm">${interview.map(q=>`<fieldset class="interviewQuestion"><legend>${q.no}. ${esc(q.title)}</legend><p>${esc(q.text)}</p><div class="choiceGrid">${q.choices.map(ch=>`<label class="choiceCard"><input type="radio" name="q${q.no}" value="${ch.no}"><span><b>${esc(ch.text)}</b></span></label>`).join("")}</div></fieldset>`).join("")}<div class="formActions"><button class="btn primary" onclick="submitCharacterInterview('${c.id}')">Finalizar entrevista y asignar ${Number(p.creationExp||0).toLocaleString("es-CL")} EXP</button></div></div></section>`;
+      } else {
+        html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Comprar desarrollo</h3><span>Siempre en múltiplos de 10 EXP</span></div><div class="purchaseGrid"><label>Área<select id="xpCategory">${Object.keys(d.categoryPools||{}).map(k=>`<option value="${k}">${esc(categoryLabel(k))}</option>`).join("")}</select></label><label>Objetivo<select id="xpTarget"></select></label><label>EXP a gastar<input id="xpAmount" type="number" min="10" step="10" value="10"></label><div class="formActions"><button class="btn primary" onclick="spendCharacterXP('${c.id}')">Comprar EXP</button></div></div><small class="muted">La EXP Disponible se reparte automáticamente por las proporciones 8/50, 8/50, 8/50, 6/50, 10/50 y 10/50.</small></section>`;
+      }
+      html+=characterSection("Rasgos Principales",CHARACTER_TRAITS,d.traits,false);
+      html+=characterSection("Talentos y Conocimientos",CHARACTER_CAPACITIES,d.capacities,true);
+      html+=characterSection("Árbol de Energía",CHARACTER_TREE,d.tree,false);
+      html+=characterSection("Elementos / Dones",CHARACTER_ELEMENTS,d.elements,false);
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Salud y Energía</h3><span>Área compartida con Rasgos Principales</span></div><div class="formGrid compact"><label>EXP Salud<input id="healthExp" type="number" min="0" max="1000" step="10" value="${Number(p.healthExp||0)}"></label><label>EXP Energía<input id="energyExp" type="number" min="0" max="1000" step="10" value="${Number(p.energyExp||0)}"></label></div><div class="formActions"><button class="btn" onclick="saveCharacterIdentity('${c.id}',true)">Guardar Salud / Energía</button></div></section>`;
+      if(currentUser.role==="ADMIN")html+=`<section class="editorCard adminDirectCard"><div class="profileSectionHead"><h3>Administración directa de EXP</h3><span>Solo ADMIN · sin límite global</span></div><p class="muted">Permite corregir o construir personajes avanzados directamente. Cada objetivo conserva el máximo de 1.000 EXP.</p><div class="adminXpGrid">${CHARACTER_TRAITS.concat(["Salud","Energía"]).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="core" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.traits||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(0,8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="talents" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="knowledge" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_TREE.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="tree" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.tree||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_ELEMENTS.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="elements" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.elements||{})[n]?.exp||0)}"></label>`).join("")}</div><section class="profileSection"><div class="profileSectionHead"><h3>Habilidades existentes</h3><span>Edición directa ADMIN</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow adminSkillEdit"><input class="adminSkillName" data-id="${esc(sk.id)}" value="${esc(sk.name||"")}"><input class="adminSkillExp" data-id="${esc(sk.id)}" type="number" min="0" max="1000" step="10" value="${Number(sk.exp||0)}"></div>`).join("")||`<div class="empty">No hay habilidades existentes.</div>`}</div></section><div class="formActions"><button class="btn primary" onclick="saveAdminCharacterStats('${c.id}')">Guardar EXP administrativa</button></div></section>`;
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Habilidades</h3><span>Desarrollo individual</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)}/1000 EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<div class="empty">Todavía no hay habilidades.</div>`}</div><div class="formGrid compact skillForm"><label>Nueva habilidad<input id="newSkillName" placeholder="Ej. Kenjutsu"></label><label>EXP inicial<input id="newSkillExp" type="number" min="10" max="1000" step="10" value="10"></label><div class="formActions"><button class="btn" onclick="addCharacterSkillUI('${c.id}')">Añadir habilidad</button></div></div></section>`;
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Historial de experiencia</h3><span>${(d.xpLogs||[]).length} movimientos</span></div><div class="dataList compactList">${(d.xpLogs||[]).slice(-30).reverse().map(x=>`<div class="dataRow"><div class="main"><b>${esc(x.sourceType||"MOVIMIENTO")}</b><small>${esc(x.note||"")} · ${esc(x.category||"")}</small></div><span class="status">${Number(x.amount||0)>0?"+":""}${Number(x.amount||0)} EXP</span></div>`).join("")||`<div class="empty">Sin movimientos todavía.</div>`}</div></section>`;
+      html+=`</div>`;
+      $("#content").innerHTML=html;
+      const ageEl=$("#ceAge"), preview=$("#creationExpPreview"); if(ageEl&&preview)ageEl.onchange=()=>preview.textContent=creationExpText(ageEl.value);
+      if(p.creationComplete){setupXPTargets(d);} 
+      document.querySelectorAll(".specialtySelect").forEach(el=>el.onchange=()=>saveCharacterSpecialties(c.id));
+    }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
+  })();
 }
-function openCharacterSheet(c){
-  const p=getCharacterProfile(c), d=calcCharacterDerived(p);
-  const specialties=Object.entries(p.specialties||{}).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${esc(v)}</span>`).join("")||`<span class="muted">Sin especialidades seleccionadas.</span>`;
-  $("#content").innerHTML=head("Ficha de personaje",esc(c.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`
-  <div class="characterSheet">
-    <div class="profileHero">
-      <div class="profilePortrait">${p.identity.imageUrl?`<img src="${esc(p.identity.imageUrl)}" alt="Imagen de ${esc(c.name)}">`:`<div>VROL</div>`}</div>
-      <div class="profileIdentity">
-        <span class="tag">PERSONAJE · ${esc(c.status)}</span>
-        <h2>${esc(p.identity.name||c.name)}</h2>
-        <p>${esc(p.identity.rank||"Rango no definido")} · ${esc(c.universeName||"Universo")}</p>
-        <small>Código: ${esc(c.characterCode)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small>
-        <p class="profileHistory">${esc(p.identity.history||c.description||"Sin historia registrada.")}</p>
-      </div>
-    </div>
-    <div class="derivedGrid">
-      <div class="derivedCard"><span>Salud máxima</span><b>${d.health}</b><small>EXP Salud: ${Number(p.healthExp||0)} / 1000</small></div>
-      <div class="derivedCard"><span>Energía máxima</span><b>${d.energy}</b><small>EXP Energía: ${Number(p.energyExp||0)} / 1000</small></div>
-    </div>
-    ${profileSection("Rasgos Principales",CHARACTER_TRAITS,p,"traits")}
-    ${profileSection("Técnicas y Talentos de Combate",CHARACTER_CAPACITIES.slice(0,8),p,"capacities",true,c)}
-    ${profileSection("Conocimientos Principales",CHARACTER_CAPACITIES.slice(8),p,"capacities",true,c)}
-
-    ${profileSection("Árbol de Energía",CHARACTER_TREE,p,"tree")}
-    <section class="profileSection"><div class="profileSectionHead"><h3>Elementos / Dones</h3><span>10 dimensiones</span></div><div class="elementGrid">${CHARACTER_ELEMENTS.map(n=>`<div class="elementCard"><span>${esc(n)}</span><b>${p.elements?.[n]?.base||0}</b><small>${p.elements?.[n]?.domain||0}%</small></div>`).join("")}</div></section>
-    <section class="profileSection"><div class="profileSectionHead"><h3>Dados</h3><span>Visual de tiradas</span></div>
-      <div class="dicePanel">
-        <div><select id="diceTrait">${CHARACTER_TRAITS.map(x=>`<option>${esc(x)}</option>`).join("")}</select>
-        <select id="diceCapacity">${CHARACTER_CAPACITIES.map(x=>`<option>${esc(x)}</option>`).join("")}</select>
-        <select id="diceSpecialty"><option value="">Sin especialidad</option></select>
-        <button class="btn primary" onclick='rollCharacterDie(${JSON.stringify(c)})'>Tirar D10</button></div>
-        <div id="diceResult" class="diceResult">Esperando tirada…</div>
-      </div>
-    </section>
-  </div>`;
-  const cap=$("#diceCapacity");
-  const sp=$("#diceSpecialty");
-  function refreshSpecialties(){
-    sp.innerHTML=`<option value="">Sin especialidad</option>`+(CHARACTER_SPECIALTIES[cap.value]||[]).map(s=>`<option>${esc(s)}</option>`).join("");
-  }
-  cap.onchange=refreshSpecialties; refreshSpecialties();
+function saveAdminCharacterStats(id){
+  if(currentUser.role!=="ADMIN")return alert("Solo ADMIN puede utilizar esta función.");
+  const allocations={core:{},talents:{},knowledge:{},tree:{},elements:{},skills:{}};document.querySelectorAll('.directXpInput').forEach(el=>allocations[el.dataset.cat][el.dataset.target]=Math.max(0,Math.min(1000,Math.round(Number(el.value||0)/10)*10)));
+  const skills=[...document.querySelectorAll(".adminSkillEdit")].map(row=>({id:row.querySelector(".adminSkillExp")?.dataset.id,name:row.querySelector(".adminSkillName")?.value.trim(),exp:Number(row.querySelector(".adminSkillExp")?.value||0)})).filter(x=>x.id&&x.name);
+  (async()=>{try{const r=await api("adminSetCharacterStats",{id,allocations,skills});alert("EXP administrativa guardada. Total: "+Number(r.totalExp||0).toLocaleString("es-CL")+" EXP");characterEditor(id)}catch(e){alert(e.message)}})();
 }
-function selectCharacterSpecialty(c,capacity,specialty){
-  const p=getCharacterProfile(c);
-  p.specialties=p.specialties||{};
-  p.specialties[capacity]=specialty;
-  localStorage.setItem(charStorageKey(c),JSON.stringify(p));
-  openCharacterSheet(c);
+function saveCharacterIdentity(id,includeHealth=false){
+  (async()=>{try{const specialties=[...document.querySelectorAll('.specialtySelect')].map(x=>({capacity:x.dataset.capacity,specialty:x.value}));const payload={id,name:$("#ceName")?.value,description:$("#ceDescription")?.value,age:Number($("#ceAge")?.value||10),specialties};if(includeHealth){payload.healthExp=Number($("#healthExp")?.value||0);payload.energyExp=Number($("#energyExp")?.value||0)}const r=await api("saveCharacterProfile",payload);alert("Ficha guardada.");characterEditor(id)}catch(e){alert(e.message)}})();}
+function saveCharacterSpecialties(id){
+  const specialties=[...document.querySelectorAll('.specialtySelect')].map(x=>({capacity:x.dataset.capacity,specialty:x.value}));
+  api("saveCharacterProfile",{id,specialties}).catch(e=>alert(e.message));
 }
-function rollCharacterDie(c){
-  const p=getCharacterProfile(c);
-  const trait=$("#diceTrait").value, capacity=$("#diceCapacity").value, specialty=$("#diceSpecialty").value;
-  const traitBase=p.traits?.[trait]?.base||0, capBase=p.capacities?.[capacity]?.base||0;
-  let min=1;
-  if(specialty){
-    const dom=p.capacities?.[capacity]?.domain||0;
-    min=dom<=20?1:dom<=40?2:dom<=60?3:dom<=80?4:5;
-  }
-  const d10=Math.floor(Math.random()*(11-min))+min;
-  const total=traitBase+capBase+d10;
-  $("#diceResult").innerHTML=`<div class="diceNumber">${d10}</div><div><b>${esc(trait)} ${traitBase} + ${esc(capacity)} ${capBase} + D10 ${d10}</b><br><span>Resultado total: <strong>${total}</strong>${specialty?` · Especialidad: ${esc(specialty)} (mín. D10 ${min})`:""}</span></div>`;
+function submitCharacterInterview(id){
+  (async()=>{const cfg=state.characterConfig||{};const qs=cfg.interview||[];const answers=qs.map(q=>{const el=document.querySelector(`input[name="q${q.no}"]:checked`);return {questionNo:q.no,choiceNo:el?Number(el.value):0}});if(answers.some(x=>!x.choiceNo)){alert("Debes responder las 9 preguntas de la entrevista.");return}try{await api("applyCharacterInterview",{id,answers});alert("Entrevista completada. La experiencia inicial fue asignada.");characterEditor(id)}catch(e){alert(e.message)}})();
+}
+function setupXPTargets(d){
+  const cat=$("#xpCategory"), target=$("#xpTarget"); if(!cat||!target)return;
+  const fill=()=>{const k=cat.value;let names=[];if(k==="core")names=CHARACTER_TRAITS.concat(["Salud","Energía"]);else if(k==="talents")names=CHARACTER_CAPACITIES.slice(0,8);else if(k==="knowledge")names=CHARACTER_CAPACITIES.slice(8);else if(k==="tree")names=CHARACTER_TREE;else if(k==="elements")names=CHARACTER_ELEMENTS;else if(k==="skills")names=(d.skills||[]).map(x=>x.name);target.innerHTML=names.map(n=>`<option>${esc(n)}</option>`).join("");};cat.onchange=fill;fill();
+}
+function addCharacterSkillUI(id){
+  const name=$("#newSkillName")?.value.trim(),exp=Number($("#newSkillExp")?.value||0);
+  if(!name){alert("Indica el nombre de la habilidad.");return;}
+  (async()=>{try{await api("addCharacterSkill",{id,name,exp});characterEditor(id)}catch(e){alert(e.message)}})();
+}
+function spendCharacterXP(id){
+  (async()=>{try{const r=await api("spendCharacterExperience",{id,category:$("#xpCategory").value,target:$("#xpTarget").value,amount:Number($("#xpAmount").value||0)});alert("EXP asignada correctamente.");characterEditor(id)}catch(e){alert(e.message)}})();
+}
+async function openCharacterSheet(c){
+  try{const r=await api("getCharacterProfile",{id:c.id});const d=r.data,p=d.profile;const derivedHealth=Math.round((d.traits?.Resistencia?.exp||0)/100*(d.traits?.Aura?.exp||0)/100*10);const derivedEnergy=Math.round((d.traits?.Voluntad?.exp||0)/100*(d.traits?.Aura?.exp||0)/100*10);
+    $("#content").innerHTML=head("Ficha de personaje",esc(c.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`<div class="characterSheet"><div class="profileHero"><div class="profilePortrait"><div>VROL</div></div><div class="profileIdentity"><span class="tag">PERSONAJE · ${esc(c.status)}</span><h2>${esc(c.name)}</h2><p>Edad inicial: ${p.age} · ${esc(c.universeName||"Universo")}</p><small>Código: ${esc(c.characterCode)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small><p class="profileHistory">${esc(c.description||"Sin historia registrada.")}</p></div></div><div class="derivedGrid"><div class="derivedCard"><span>Salud máxima</span><b>${derivedHealth}</b><small>EXP Salud: ${p.healthExp}/1000</small></div><div class="derivedCard"><span>Energía máxima</span><b>${derivedEnergy}</b><small>EXP Energía: ${p.energyExp}/1000</small></div><div class="derivedCard"><span>EXP Disponible</span><b>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</b><small>EXP ganada: ${Number(p.experienceEarned||0).toLocaleString("es-CL")}</small></div></div>${characterSection("Rasgos Principales",CHARACTER_TRAITS,d.traits,false)}${characterSection("Talentos y Conocimientos",CHARACTER_CAPACITIES,d.capacities,true)}${characterSection("Árbol de Energía",CHARACTER_TREE,d.tree,false)}${characterSection("Elementos / Dones",CHARACTER_ELEMENTS,d.elements,false)}<section class="profileSection"><div class="profileSectionHead"><h3>Habilidades</h3><span>${(d.skills||[]).length} habilidad(es)</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)}/1000 EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<span class="muted">Sin habilidades registradas.</span>`}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Especialidades seleccionadas</h3><span>Integradas en Talentos y Conocimientos</span></div><div class="specialtyChips">${Object.entries(d.capacities||{}).filter(([k,v])=>v.specialty).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${esc(v.specialty)}</span>`).join("")||`<span class="muted">Sin especialidades seleccionadas.</span>`}</div></section></div>`;
+  }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
 
 async function tableForm(){
@@ -344,25 +341,16 @@ async function tableForm(){
 
 async function sessionForm(){
   try{
-    const r=await api("dashboard",{view:"tables"});
-    const tables=r.data.tables||[];
-    $("#content").innerHTML=head("Nueva sesión","Una sesión es una reunión temporal de una mesa.")+
-    `<form id="sf" class="formGrid">
-      <label>Mesa<select name="tableId" required><option value="">Seleccionar mesa...</option>${tables.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} · ${esc(t.universeName||"")}</option>`).join("")}</select></label>
-      ${field("Título","title")}
-      ${field("Inicio","startAt","datetime-local")}
-      ${field("Término","endAt","datetime-local")}
-      ${field("Módulo / capítulo","moduleTitle")}
-      <label>Modalidad<select name="medium"><option value="ONLINE">ONLINE</option><option value="PRESENCIAL">PRESENCIAL</option></select></label>
-      <div class="full formActions"><button class="btn primary">Crear sesión</button></div>
-    </form>`;
-    $("#sf").onsubmit=async e=>{
-      e.preventDefault();
-      try{
-        await api("createSession",formData(e.target));
-        navigate("sessions");
-      }catch(x){alert(x.message)}
-    };
+    const r=await api("dashboard",{view:"sessions"});
+    const tableChars=r.data.tableCharacters||{};
+    const tables=Object.keys(tableChars).map(id=>({id,name:(r.data.sessions.find(x=>String(x.tableId)===String(id))?.tableName||id)}));
+    const tableOptions=tables.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+    const firstTable=tables[0]?.id||"";
+    const participantHtml=id=>(tableChars[id]||[]).map(c=>`<label class="choiceCard participantChoice"><input type="checkbox" name="characterIds" value="${esc(c.id)}"><span><b>${esc(c.name)}</b><small>${esc(c.playerUsername||"")} · ${esc(c.characterCode||"")}</small></span></label>`).join("")||`<div class="empty">Esta mesa todavía no tiene personajes miembros.</div>`;
+    const renderParticipants=()=>{const id=$("#sfTable")?.value||firstTable;const box=$("#sessionParticipants");if(box)box.innerHTML=participantHtml(id)};
+    $("#content").innerHTML=head("Nueva sesión","Una sesión es una reunión temporal. Puedes declarar participantes concretos; si no seleccionas ninguno, al cerrar se considera a todos los miembros activos de la mesa.")+`<form id="sf" class="formGrid"><label>Mesa<select id="sfTable" name="tableId" required>${tableOptions}</select></label>${field("Título","title")}${field("Inicio","startAt","datetime-local")}${field("Término","endAt","datetime-local")}${field("Módulo / capítulo","moduleTitle")}<label>Modalidad<select name="medium"><option value="ONLINE">ONLINE</option><option value="PRESENCIAL">PRESENCIAL</option></select></label><div class="full"><div class="profileSectionHead"><h3>Participantes invitados</h3><span>Opcional</span></div><div id="sessionParticipants" class="choiceGrid"></div></div><div class="full formActions"><button class="btn primary">Crear sesión</button></div></form>`;
+    $("#sfTable").onchange=renderParticipants;renderParticipants();
+    $("#sf").onsubmit=async e=>{e.preventDefault();try{const fd=formData(e.target);fd.characterIds=[...e.target.querySelectorAll('input[name="characterIds"]:checked')].map(x=>x.value);await api("createSession",fd);navigate("sessions")}catch(x){alert(x.message)}};
   }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
 async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");localStorage.removeItem("VROL_USER");token="";currentUser=null;window.location.href="index.html"}
