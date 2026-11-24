@@ -60,12 +60,15 @@ function renderPublic(d){
 }
 function youtubeId(url){const m=String(url||"").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);return m?m[1]:""}
 
-$("#loginForm").addEventListener("submit",async e=>{
-  e.preventDefault();$("#loginError").textContent="";
-  try{const r=await api("login",{username:$("#loginUser").value.trim(),password:$("#loginPass").value});
-    token=r.token;currentUser=r.user;localStorage.setItem("VROL_TOKEN",token);localStorage.setItem("VROL_USER",JSON.stringify(currentUser));hideLogin();openPanel();
-  }catch(x){$("#loginError").textContent=x.message}
-});
+const loginForm = $("#loginForm");
+if(loginForm){
+  loginForm.addEventListener("submit",async e=>{
+    e.preventDefault();$("#loginError").textContent="";
+    try{const r=await api("login",{username:$("#loginUser").value.trim(),password:$("#loginPass").value});
+      token=r.token;currentUser=r.user;localStorage.setItem("VROL_TOKEN",token);localStorage.setItem("VROL_USER",JSON.stringify(currentUser));hideLogin();openPanel();
+    }catch(x){$("#loginError").textContent=x.message}
+  });
+}
 
 function openPanel(){ window.location.href="app.html#dashboard"; }
 function renderShell(){
