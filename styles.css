@@ -312,9 +312,14 @@ input, textarea, select { overflow-wrap: anywhere; }
   .specialtyOptions .specialtyOption{font-size:8px;padding:4px 6px}
 }
 
-/* ===== Authenticated app page: static shell ===== */
-.appShell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 72px);width:100%;align-items:stretch}
-.appShell .side{min-width:0;min-height:calc(100vh - 72px);height:calc(100vh - 72px);position:sticky;top:72px;overflow-y:auto;overflow-x:hidden}
-.appShell .content{min-width:0;min-height:calc(100vh - 72px);width:100%;overflow:visible}
+/* ===== Authenticated app page: real subpage layout ===== */
+.appShell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:calc(100vh - 72px);width:100%;max-width:none;align-items:stretch}
+.appShell .side{min-width:0;width:100%;min-height:calc(100vh - 72px);height:calc(100vh - 72px);position:sticky;top:72px;overflow-y:auto;overflow-x:hidden;background:#0a0d12;border-right:1px solid #232a33;padding:24px 14px}
+.appShell .content{min-width:0;width:auto;max-width:none;min-height:calc(100vh - 72px);height:calc(100vh - 72px);padding:38px clamp(20px,4vw,52px) 60px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.appShell #content{min-width:0;max-width:none;width:auto}
+.appShell .contentHeader,.appShell .contentHeader>div,.appShell .characterSheet,.appShell .profileSection,.appShell .profileHero,.appShell .profileIdentity,.appShell .dataList,.appShell .dataRow,.appShell .formGrid,.appShell .kpis,.appShell .cards,.appShell .cmsGrid{min-width:0;max-width:none}
+.appShell .profileHistory{max-width:none}
+.appShell .profileStats{min-width:0;max-width:none}
+.appShell .profileStat{min-width:0;max-width:none}
 @media(max-width:900px){.appShell{grid-template-columns:190px minmax(0,1fr)}}
-@media(max-width:700px){.appShell{display:block;min-height:0}.appShell .side{position:sticky;top:64px;width:100%;height:auto;min-height:0;max-height:none;overflow-x:auto;overflow-y:hidden}.appShell .content{min-height:0;overflow:visible}}
+@media(max-width:700px){.appShell{display:block;min-height:0}.appShell .side{position:sticky;top:64px;width:100%;height:auto;min-height:0;max-height:78px;overflow-x:auto;overflow-y:hidden;display:flex;gap:4px}.appShell .content{width:100%;height:auto;min-height:calc(100vh - 142px);overflow-y:auto;overflow-x:hidden}}
