@@ -380,3 +380,75 @@ input, textarea, select { overflow-wrap: anywhere; }
 .quickRollCard{display:flex;justify-content:space-between;align-items:center;gap:18px;background:#12171f;border:1px solid #2a3440;border-radius:14px;padding:18px;margin-bottom:18px}.quickRollCard h3{margin:8px 0 3px}.quickRollControls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.quickRollControls input{min-width:150px;background:#090c11;border:1px solid #2d3540;color:#fff;border-radius:7px;padding:11px}.quickRollControls b{font-size:20px;min-width:180px;text-align:center}.techniqueList{display:grid;gap:10px}.techniqueCard{display:flex;justify-content:space-between;gap:18px;align-items:center;background:#0d1117;border:1px solid #252d37;border-radius:11px;padding:15px}.techniqueCard h4{margin:7px 0}.techniqueCard p{margin:5px 0;color:#8893a1}.techniqueCard small{color:#6f7a89}.techniqueActions{display:flex;align-items:center;gap:8px;white-space:nowrap}.techEffectRow{display:grid;grid-template-columns:1fr 1.3fr 1fr .65fr;gap:10px;background:#0d1117;border:1px solid #252d37;border-radius:9px;padding:10px;margin-bottom:8px}.techEffectRow label{margin:0}.appShell .profileSection{min-width:0}.appShell .techniqueCard{min-width:0}.appShell .techniqueCard>div:first-child{min-width:0}@media(max-width:800px){.quickRollCard{display:block}.quickRollControls{margin-top:12px}.techniqueCard{display:block}.techniqueActions{margin-top:12px}.techEffectRow{grid-template-columns:1fr}}
 
 .dashboardCharactersSection{margin-top:18px}.dashboardCharacterSheet{background:var(--panel,#11161d);border:1px solid var(--line,#27303a);border-radius:12px;padding:16px;margin:14px 0}.dashboardCharacterSheet .profileHero{margin:0 0 12px}.dashboardCharacterSheet .profileHero.compact{min-height:0}.dashboardCharacterSheet .derivedGrid{margin-top:10px}.dashboardCharacterSheet .profileSection{margin-top:12px;padding-top:12px}.dashboardCharacterSheet .profileSectionHead h3{font-size:14px}.dashboardCharacterSheet .formActions{margin-top:14px}.dashboardCharacterSheet .specialtyChips{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ===== Global loading / request feedback ===== */
+.vrolLoader{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,6,10,.72);backdrop-filter:blur(4px);padding:20px;box-sizing:border-box}
+.vrolLoader.hidden{display:none}
+.vrolLoaderCard{width:min(420px,calc(100vw - 40px));background:#11161d;border:1px solid #313a47;border-radius:16px;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:24px;text-align:center}
+.vrolLoaderSpinner{width:34px;height:34px;margin:0 auto 14px;border:3px solid #303845;border-top-color:#eef1f5;border-radius:50%;animation:vrolSpin .8s linear infinite}
+.vrolLoaderTitle{font-weight:900;letter-spacing:.14em;font-size:12px;color:#eef1f5}
+.vrolLoaderMessage{margin-top:8px;color:#c4ccd6;font-size:14px}
+.vrolLoaderTrack{height:6px;background:#252c36;border-radius:99px;overflow:hidden;margin:18px 0 10px}
+.vrolLoaderBar{height:100%;width:38%;background:#e9edf2;border-radius:99px;animation:vrolLoadIndeterminate 1.15s ease-in-out infinite}
+.vrolLoaderHint{font-size:11px;color:#778292}
+.vrolInlineSpinner{display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;vertical-align:-1px;margin-right:5px;animation:vrolSpin .7s linear infinite}
+body.vrolLoadingActive{cursor:wait}
+body.vrolLoadingActive .vrolLoader{cursor:wait}
+button:disabled{opacity:.65;cursor:wait}
+@keyframes vrolSpin{to{transform:rotate(360deg)}}
+@keyframes vrolLoadIndeterminate{0%{transform:translateX(-130%)}50%{transform:translateX(130%)}100%{transform:translateX(300%)}}
+@media(prefers-reduced-motion:reduce){.vrolLoaderSpinner,.vrolLoaderBar{animation:none}.vrolLoaderBar{width:60%}}
+
+/* ===== FIX: authenticated viewport / interview scrolling ===== */
+/* The authenticated app uses one stable viewport: the right content pane owns
+   vertical scrolling on desktop, so the browser document itself does not move. */
+@media (min-width: 701px) {
+  html:has(.appBody), body.appBody {
+    height: 100%;
+    overflow: hidden;
+  }
+  .appBody {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  .appPage {
+    height: 100vh;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+  .appShell {
+    height: calc(100vh - 72px);
+    min-height: 0;
+    overflow: hidden;
+  }
+  .appShell .side {
+    height: calc(100vh - 72px);
+    min-height: 0;
+  }
+  .appShell .content {
+    height: calc(100vh - 72px);
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    scroll-behavior: auto;
+  }
+}
+
+/* Keep the mobile experience as normal document scrolling. */
+@media (max-width: 700px) {
+  html:has(.appBody), body.appBody, .appPage {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .appShell .content {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+}

@@ -5,19 +5,91 @@ try{currentUser=JSON.parse(localStorage.getItem("VROL_USER")||"null")}catch(e){c
 
 const $=s=>document.querySelector(s);
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+/* ===== VROL Global Loading Controller ===== */
+let _vrolLoadingCount=0, _vrolLoadingTimer=null;
+const VROL_LOADING_TEXT={
+  login:"Verificando acceso…",
+  publicData:"Cargando información pública…",
+  dashboard:"Cargando panel…",
+  getCharacterProfile:"Cargando ficha de personaje…",
+  createCharacter:"Creando personaje…",
+  applyCharacterInterview:"Procesando entrevista…",
+  saveCharacterProfile:"Guardando ficha…",
+  createAdvancedCharacter:"Creando personaje especializado…",
+  spendCharacterExperience:"Guardando distribución de EXP…",
+  buyTechnique:"Adquiriendo técnica…",
+  assignTechnique:"Asignando técnica…",
+  createTechnique:"Guardando técnica / habilidad…",
+  createUniverse:"Creando universo…",
+  updateUniverse:"Guardando universo…",
+  createTable:"Creando mesa…",
+  createSession:"Creando sesión…",
+  default:"Procesando solicitud…"
+};
+function ensureVROLLoader(){
+  if(document.getElementById("vrolGlobalLoader"))return;
+  const el=document.createElement("div");
+  el.id="vrolGlobalLoader";
+  el.className="vrolLoader hidden";
+  el.setAttribute("aria-live","polite");
+  el.setAttribute("aria-busy","false");
+  el.innerHTML=`<div class="vrolLoaderCard"><div class="vrolLoaderSpinner" aria-hidden="true"></div><div class="vrolLoaderTitle">VROL</div><div id="vrolLoaderMessage" class="vrolLoaderMessage">Procesando solicitud…</div><div class="vrolLoaderTrack"><div class="vrolLoaderBar"></div></div><div class="vrolLoaderHint">No cierres esta ventana mientras se procesa la solicitud.</div></div>`;
+  document.body.appendChild(el);
+}
+function showVROLLoader(message="Procesando solicitud…"){
+  ensureVROLLoader();
+  const el=$("#vrolGlobalLoader"), msg=$("#vrolLoaderMessage");
+  if(msg)msg.textContent=message;
+  _vrolLoadingCount++;
+  clearTimeout(_vrolLoadingTimer);
+  _vrolLoadingTimer=setTimeout(()=>{
+    if(_vrolLoadingCount>0){el.classList.remove("hidden");el.setAttribute("aria-busy","true");document.body.classList.add("vrolLoadingActive");}
+  },120);
+}
+function hideVROLLoader(){
+  _vrolLoadingCount=Math.max(0,_vrolLoadingCount-1);
+  if(_vrolLoadingCount===0){
+    clearTimeout(_vrolLoadingTimer);
+    const el=$("#vrolGlobalLoader");
+    if(el){el.classList.add("hidden");el.setAttribute("aria-busy","false");}
+    document.body.classList.remove("vrolLoadingActive");
+  }
+}
+function setVROLLoaderMessage(message){const el=$("#vrolLoaderMessage");if(el)el.textContent=message;}
+function setVROLButtonBusy(button,busy){
+  if(!button)return;
+  if(busy){button.dataset.vrolOriginalText=button.innerHTML;button.disabled=true;button.innerHTML=`<span class="vrolInlineSpinner"></span> Procesando…`;}
+  else if(button.dataset.vrolOriginalText!==undefined){button.disabled=false;button.innerHTML=button.dataset.vrolOriginalText;delete button.dataset.vrolOriginalText;}
+}
+
 function showLogin(){$("#loginModal").classList.remove("hidden");$("#loginUser").focus()}
 function hideLogin(){$("#loginModal").classList.add("hidden")}
 function closePanel(){window.location.href="index.html"}
 async function api(action,data={}){
   if(API.includes("PEGAR_URL")) throw new Error("Configura la URL /exec de Apps Script en app.js.");
-  const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,...data,token})});
-  const j=await r.json();
-  if(!j.ok) throw new Error(j.error||"Error de API");
-  return j;
+  showVROLLoader(VROL_LOADING_TEXT[action]||VROL_LOADING_TEXT.default);
+  try{
+    const r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({action,...data,token})});
+    if(!r.ok)throw new Error(`Error HTTP ${r.status}`);
+    const j=await r.json();
+    if(!j.ok) throw new Error(j.error||"Error de API");
+    return j;
+  }catch(e){
+    throw e;
+  }finally{
+    hideVROLLoader();
+  }
 }
 async function loadPublic(){
   try{
-    const r=await api("publicData"); renderPublic(r.data);
+    const cacheKey="VROL_PUBLIC_CACHE_V1";
+    const cached=JSON.parse(sessionStorage.getItem(cacheKey)||"null");
+    const fresh=cached&&cached.savedAt&&(Date.now()-Number(cached.savedAt)<60000);
+    if(fresh){renderPublic(cached.data);return;}
+    const r=await api("publicData");
+    try{sessionStorage.setItem(cacheKey,JSON.stringify({savedAt:Date.now(),data:r.data}));}catch(e){}
+    renderPublic(r.data);
   }catch(e){
     console.warn("VROL API:",e.message);
     const msg=$("#apiStatus");
@@ -440,6 +512,34 @@ async function sessionForm(){
   }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
 async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");localStorage.removeItem("VROL_USER");token="";currentUser=null;window.location.href="index.html"}
+
+/* Preserve the current authenticated content scroll position when an interview choice
+   receives focus. Some browsers otherwise scroll the nearest focused control to the
+   bottom of the page/pane, making the rest of the interview disappear. */
+function preserveInterviewScroll(){
+  const content=document.querySelector('.appShell .content');
+  if(!content)return;
+  let saved=content.scrollTop;
+  const restore=()=>{
+    content.scrollTop=saved;
+    window.scrollTo(0,0);
+  };
+  document.querySelectorAll('.interviewCard input[type="radio"]').forEach(el=>{
+    el.addEventListener('pointerdown',()=>{saved=content.scrollTop;});
+    el.addEventListener('mousedown',()=>{saved=content.scrollTop;});
+    el.addEventListener('focus',()=>{requestAnimationFrame(restore);});
+    el.addEventListener('change',()=>{requestAnimationFrame(restore);setTimeout(restore,0);});
+  });
+}
+
+const _originalCharacterEditor=characterEditor;
+characterEditor=function(id){
+  const result=_originalCharacterEditor(id);
+  setTimeout(preserveInterviewScroll,50);
+  return result;
+};
+
+document.addEventListener("DOMContentLoaded",()=>ensureVROLLoader());
 
 if($("#authApp")){
   if(!token||!currentUser){window.location.href="index.html";}
