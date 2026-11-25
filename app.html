@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VROL | Panel</title>
-<link rel="stylesheet" href="styles.css?v=1.7.0">
+<link rel="stylesheet" href="styles.css?v=2.0.0">
 </head>
 <body class="appBody">
 <div id="authApp" class="appPage">
@@ -20,6 +20,15 @@
   <main id="content" class="content"></main>
 </div>
 </div>
-<script src="app.js?v=1.7.0"></script>
+<div id="vrolGlobalLoader" class="vrolLoader hidden" aria-live="polite" aria-busy="false">
+  <div class="vrolLoaderCard" role="status">
+    <div class="vrolLoaderSpinner" aria-hidden="true"></div>
+    <div class="vrolLoaderTitle">VROL</div>
+    <div id="vrolLoaderMessage" class="vrolLoaderMessage">Procesando solicitud…</div>
+    <div class="vrolLoaderTrack"><div class="vrolLoaderBar"></div></div>
+    <div class="vrolLoaderHint">No cierres esta ventana mientras se procesa la solicitud.</div>
+  </div>
+</div>
+<script src="app.js?v=2.0.0"></script>
 </body>
 </html>

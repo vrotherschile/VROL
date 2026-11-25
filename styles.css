@@ -382,8 +382,8 @@ input, textarea, select { overflow-wrap: anywhere; }
 .dashboardCharactersSection{margin-top:18px}.dashboardCharacterSheet{background:var(--panel,#11161d);border:1px solid var(--line,#27303a);border-radius:12px;padding:16px;margin:14px 0}.dashboardCharacterSheet .profileHero{margin:0 0 12px}.dashboardCharacterSheet .profileHero.compact{min-height:0}.dashboardCharacterSheet .derivedGrid{margin-top:10px}.dashboardCharacterSheet .profileSection{margin-top:12px;padding-top:12px}.dashboardCharacterSheet .profileSectionHead h3{font-size:14px}.dashboardCharacterSheet .formActions{margin-top:14px}.dashboardCharacterSheet .specialtyChips{display:flex;flex-wrap:wrap;gap:6px}
 
 /* ===== Global loading / request feedback ===== */
-.vrolLoader{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(3,6,10,.72);backdrop-filter:blur(4px);padding:20px;box-sizing:border-box}
-.vrolLoader.hidden{display:none}
+.vrolLoader{position:fixed;inset:0;width:100vw;height:100vh;z-index:2147483647;display:grid;place-items:center;background:rgba(3,6,10,.78);backdrop-filter:blur(4px);padding:20px;box-sizing:border-box;pointer-events:auto}
+.vrolLoader.hidden{display:none!important;pointer-events:none}
 .vrolLoaderCard{width:min(420px,calc(100vw - 40px));background:#11161d;border:1px solid #313a47;border-radius:16px;box-shadow:0 20px 80px rgba(0,0,0,.45);padding:24px;text-align:center}
 .vrolLoaderSpinner{width:34px;height:34px;margin:0 auto 14px;border:3px solid #303845;border-top-color:#eef1f5;border-radius:50%;animation:vrolSpin .8s linear infinite}
 .vrolLoaderTitle{font-weight:900;letter-spacing:.14em;font-size:12px;color:#eef1f5}
@@ -399,56 +399,60 @@ button:disabled{opacity:.65;cursor:wait}
 @keyframes vrolLoadIndeterminate{0%{transform:translateX(-130%)}50%{transform:translateX(130%)}100%{transform:translateX(300%)}}
 @media(prefers-reduced-motion:reduce){.vrolLoaderSpinner,.vrolLoaderBar{animation:none}.vrolLoaderBar{width:60%}}
 
-/* ===== FIX: authenticated viewport / interview scrolling ===== */
-/* The authenticated app uses one stable viewport: the right content pane owns
-   vertical scrolling on desktop, so the browser document itself does not move. */
-@media (min-width: 701px) {
-  html:has(.appBody), body.appBody {
-    height: 100%;
-    overflow: hidden;
-  }
-  .appBody {
-    height: 100vh;
-    min-height: 100vh;
-    overflow: hidden;
-  }
-  .appPage {
-    height: 100vh;
-    min-height: 100vh;
-    overflow: hidden;
-  }
-  .appShell {
-    height: calc(100vh - 72px);
-    min-height: 0;
-    overflow: hidden;
-  }
-  .appShell .side {
-    height: calc(100vh - 72px);
-    min-height: 0;
-  }
-  .appShell .content {
-    height: calc(100vh - 72px);
-    min-height: 0;
-    max-height: none;
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior: contain;
-    scrollbar-gutter: stable;
-    scroll-behavior: auto;
-  }
+/* Global loading feedback: always above the application viewport */
+.vrolLoader::before{
+  content:"";
+  position:fixed;
+  left:0;
+  top:0;
+  width:100%;
+  height:3px;
+  background:linear-gradient(90deg,transparent 0%,#eef1f5 25%,transparent 50%,#eef1f5 75%,transparent 100%);
+  background-size:200% 100%;
+  animation:vrolTopLoad 1s linear infinite;
 }
+@keyframes vrolTopLoad{from{background-position:200% 0}to{background-position:-200% 0}}
 
-/* Keep the mobile experience as normal document scrolling. */
-@media (max-width: 700px) {
-  html:has(.appBody), body.appBody, .appPage {
-    height: auto;
-    min-height: 100%;
-    overflow: visible;
-  }
-  .appShell .content {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-    overscroll-behavior: auto;
-  }
+/* VROL 2.0 — ficha, especialidades, salud y bibliotecas */
+.profileStatName{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.statLimit{font-size:9px;color:#8e98a7;border:1px solid #303844;border-radius:99px;padding:3px 6px;font-weight:600;white-space:nowrap}
+.profileStatValue small{margin-left:auto;color:#6f7988;font-size:9px}
+.specialtyOptions{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.specialtyOption{border:1px solid #303844;background:#11161d;color:#8f99a7;border-radius:6px;padding:5px 7px;font-size:9px;line-height:1.2}
+.specialtyOption.selected{background:#e9edf2;color:#090b0e;border-color:#e9edf2;font-weight:700}
+.specialtyOption.locked{opacity:.35}
+.vitalsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.vitalCard{background:#0d1117;border:1px solid #222933;border-radius:10px;padding:14px}
+.vitalCard>div:first-child{display:flex;align-items:end;justify-content:space-between;gap:10px}
+.vitalCard span{color:#8f99a7;font-size:11px}
+.vitalCard b{font-size:26px}
+.vitalCard small{color:#697482}
+.lifeBar{height:9px;background:#202631;border-radius:999px;overflow:hidden;margin-top:10px}
+.lifeBar span{display:block;height:100%;background:#e9edf2;border-radius:999px;transition:width .25s ease}
+.lifeMeta{display:block;margin-top:5px;color:#737d8c;font-size:9px}
+.bodyHealthGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.bodyHealthCard{background:#0d1117;border:1px solid #222933;border-radius:10px;padding:12px}
+.bodyHealthCard>div:first-child{display:flex;justify-content:space-between;gap:8px}
+.bodyHealthCard b{font-size:12px}.bodyHealthCard span{font-size:9px;color:#737d8c}
+.combinedRollCard{display:flex;justify-content:space-between;align-items:center;gap:18px;background:#12171f;border:1px solid #2a3440;border-radius:14px;padding:18px;margin-bottom:18px;position:sticky;top:0;z-index:4}
+.combinedRollCard h3{margin:7px 0 3px}.combinedRollCard small{color:#7e8998}
+.combinedRollControls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.combinedRollControls select{min-width:145px;background:#0d1117;border:1px solid #303844;color:#eef1f5;border-radius:8px;padding:9px}
+.d10Badge{display:inline-grid;place-items:center;width:34px;height:34px;border:1px solid #697482;border-radius:8px;font-weight:900}
+.combinedRollResult{min-width:105px;text-align:center;border-left:1px solid #303844;padding-left:12px}
+.combinedRollResult b{display:block;font-size:28px}.combinedRollResult span{display:block;font-weight:800}.combinedRollResult small{display:block;margin-top:3px;font-size:8px}
+.dashboardCharacterShortcuts{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.dashboardCharacterShortcut{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;background:#0d1117;border:1px solid #222933;border-radius:12px;padding:14px}
+.shortcutIdentity h3{margin:7px 0 3px}.shortcutIdentity small{color:#697482}.shortcutMeta{text-align:right}.shortcutMeta span{display:block;color:#697482;font-size:9px;text-transform:uppercase}.shortcutMeta b{font-size:18px}.shortcutMeta .xpPending{color:#eef1f5}.shortcutActions{display:flex;gap:6px}
+.universeLibraryGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.universeLibraryButton{display:flex;flex-direction:column;align-items:flex-start;gap:5px;background:#0d1117;border:1px solid #303844;color:#eef1f5;border-radius:11px;padding:16px;text-align:left}
+.universeLibraryButton:hover{border-color:#697482}.universeLibraryButton span{font-weight:800}.universeLibraryButton small{color:#737d8c}
+.interviewConfigGrid{display:grid;gap:10px;margin-top:12px}
+.interviewConfigRow{display:grid;grid-template-columns:110px repeat(4,minmax(0,1fr));gap:8px;align-items:end;background:#0d1117;border:1px solid #222933;border-radius:10px;padding:10px}
+.interviewConfigRow>b{font-size:11px}.interviewConfigRow label{font-size:8px;color:#737d8c}.interviewConfigRow input{width:100%;margin-top:4px}
+.appBody{height:100vh;overflow:hidden}.appPage{height:100vh;overflow:hidden}
+.appShell{height:calc(100vh - 72px);min-height:0}.appShell .content{height:100%;overflow-y:auto;overflow-x:hidden;min-height:0}
+@media(max-width:700px){
+  .appBody{height:auto;overflow:auto}.appPage{height:auto;min-height:100vh;overflow:visible}.appShell{height:auto;min-height:0}.appShell .content{height:auto;overflow:visible}
+  .vitalsGrid,.bodyHealthGrid{grid-template-columns:1fr}.combinedRollCard{position:static;align-items:flex-start;flex-direction:column}.combinedRollControls{justify-content:flex-start}.dashboardCharacterShortcuts{grid-template-columns:1fr}.dashboardCharacterShortcut{grid-template-columns:1fr}.shortcutMeta{text-align:left}.shortcutActions{justify-content:flex-start}.interviewConfigRow{grid-template-columns:1fr 1fr}
 }

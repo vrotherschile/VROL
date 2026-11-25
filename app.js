@@ -7,7 +7,9 @@ const $=s=>document.querySelector(s);
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
 /* ===== VROL Global Loading Controller ===== */
-let _vrolLoadingCount=0, _vrolLoadingTimer=null;
+let _vrolLoadingCount=0;
+let _vrolLoaderShownAt=0;
+let _vrolHideTimer=null;
 const VROL_LOADING_TEXT={
   login:"Verificando acceso…",
   publicData:"Cargando información pública…",
@@ -28,39 +30,63 @@ const VROL_LOADING_TEXT={
   default:"Procesando solicitud…"
 };
 function ensureVROLLoader(){
-  if(document.getElementById("vrolGlobalLoader"))return;
-  const el=document.createElement("div");
+  let el=document.getElementById("vrolGlobalLoader");
+  if(el)return el;
+  if(!document.body)return null;
+  el=document.createElement("div");
   el.id="vrolGlobalLoader";
   el.className="vrolLoader hidden";
   el.setAttribute("aria-live","polite");
   el.setAttribute("aria-busy","false");
-  el.innerHTML=`<div class="vrolLoaderCard"><div class="vrolLoaderSpinner" aria-hidden="true"></div><div class="vrolLoaderTitle">VROL</div><div id="vrolLoaderMessage" class="vrolLoaderMessage">Procesando solicitud…</div><div class="vrolLoaderTrack"><div class="vrolLoaderBar"></div></div><div class="vrolLoaderHint">No cierres esta ventana mientras se procesa la solicitud.</div></div>`;
+  el.innerHTML=`<div class="vrolLoaderCard" role="status"><div class="vrolLoaderSpinner" aria-hidden="true"></div><div class="vrolLoaderTitle">VROL</div><div id="vrolLoaderMessage" class="vrolLoaderMessage">Procesando solicitud…</div><div class="vrolLoaderTrack"><div class="vrolLoaderBar"></div></div><div class="vrolLoaderHint">No cierres esta ventana mientras se procesa la solicitud.</div></div>`;
   document.body.appendChild(el);
+  return el;
 }
 function showVROLLoader(message="Procesando solicitud…"){
-  ensureVROLLoader();
-  const el=$("#vrolGlobalLoader"), msg=$("#vrolLoaderMessage");
+  const el=ensureVROLLoader();
+  if(!el)return;
+  const msg=el.querySelector("#vrolLoaderMessage");
   if(msg)msg.textContent=message;
   _vrolLoadingCount++;
-  clearTimeout(_vrolLoadingTimer);
-  _vrolLoadingTimer=setTimeout(()=>{
-    if(_vrolLoadingCount>0){el.classList.remove("hidden");el.setAttribute("aria-busy","true");document.body.classList.add("vrolLoadingActive");}
-  },120);
+  clearTimeout(_vrolHideTimer);
+  if(_vrolLoadingCount===1){
+    _vrolLoaderShownAt=performance.now();
+    el.classList.remove("hidden");
+    el.setAttribute("aria-busy","true");
+    document.body.classList.add("vrolLoadingActive");
+  }
 }
 function hideVROLLoader(){
   _vrolLoadingCount=Math.max(0,_vrolLoadingCount-1);
-  if(_vrolLoadingCount===0){
-    clearTimeout(_vrolLoadingTimer);
-    const el=$("#vrolGlobalLoader");
-    if(el){el.classList.add("hidden");el.setAttribute("aria-busy","false");}
+  if(_vrolLoadingCount!==0)return;
+  const el=document.getElementById("vrolGlobalLoader");
+  const elapsed=performance.now()-_vrolLoaderShownAt;
+  const wait=Math.max(0,220-elapsed);
+  clearTimeout(_vrolHideTimer);
+  _vrolHideTimer=setTimeout(()=>{
+    if(_vrolLoadingCount!==0)return;
+    if(el){
+      el.classList.add("hidden");
+      el.setAttribute("aria-busy","false");
+    }
     document.body.classList.remove("vrolLoadingActive");
-  }
+  },wait);
 }
-function setVROLLoaderMessage(message){const el=$("#vrolLoaderMessage");if(el)el.textContent=message;}
+function setVROLLoaderMessage(message){
+  const el=document.getElementById("vrolLoaderMessage");
+  if(el)el.textContent=message;
+}
 function setVROLButtonBusy(button,busy){
   if(!button)return;
-  if(busy){button.dataset.vrolOriginalText=button.innerHTML;button.disabled=true;button.innerHTML=`<span class="vrolInlineSpinner"></span> Procesando…`;}
-  else if(button.dataset.vrolOriginalText!==undefined){button.disabled=false;button.innerHTML=button.dataset.vrolOriginalText;delete button.dataset.vrolOriginalText;}
+  if(busy){
+    button.dataset.vrolOriginalText=button.innerHTML;
+    button.disabled=true;
+    button.innerHTML=`<span class="vrolInlineSpinner"></span> Procesando…`;
+  }else if(button.dataset.vrolOriginalText!==undefined){
+    button.disabled=false;
+    button.innerHTML=button.dataset.vrolOriginalText;
+    delete button.dataset.vrolOriginalText;
+  }
 }
 
 function showLogin(){$("#loginModal").classList.remove("hidden");$("#loginUser").focus()}
@@ -145,9 +171,9 @@ if(loginForm){
 function openPanel(){ window.location.href="app.html#dashboard"; }
 function renderShell(){
   const menus=currentUser.role==="ADMIN"
-    ? [["dashboard","Inicio"],["users","Usuarios"],["universes","Universos"],["characters","Personajes"],["techniques","Técnicas y Habilidades"],["tables","Mesas"],["sessions","Sesiones"],["site","Index / CMS"],["settings","Configuración"],["audit","Auditoría"]]
+    ? [["dashboard","Inicio"],["users","Usuarios"],["universes","Universos"],["characters","Personajes"],["techniques","Habilidades"],["tables","Mesas"],["sessions","Sesiones"],["site","Index / CMS"],["settings","Configuración"],["audit","Auditoría"]]
     : currentUser.role==="GM"
-    ? [["dashboard","Inicio"],["universes","Mis universos"],["characters","Personajes"],["techniques","Técnicas y Habilidades"],["tables","Mis mesas"],["sessions","Sesiones"]]
+    ? [["dashboard","Inicio"],["universes","Mis universos"],["characters","Personajes"],["techniques","Habilidades"],["tables","Mis mesas"],["sessions","Sesiones"]]
     : [["dashboard","Inicio"],["characters","Mis personajes"],["tables","Mesas"],["sessions","Sesiones"]];
   const side=$("#appSide");
   if(!side)return;
@@ -168,19 +194,12 @@ async function navigate(view,updateHash=true){
 function head(title,sub,button=""){return `<div class="contentHeader"><div><h1>${title}</h1><p class="muted">${sub}</p></div>${button}</div>`}
 function drawDashboard(d){
   const sheets=d.myCharacterSheets||[];
-  const cards=sheets.map((s,i)=>{
+  const cards=sheets.map(s=>{
     const c=s.character,p=s.profile||{},uc=s.universeConfig||{};
-    const traits=s.traits||{}, tree=s.tree||{}, caps=s.capacities||{}, elements=s.elements||{};
-    const stat=(obj,n)=>Number(obj?.[n]?.exp||0)/100;
-    const chips=Object.entries(traits).map(([n,v])=>`<span class="specialtyChip">${esc(n)} ${stat(traits,n).toFixed(0)}</span>`).join("");
-    const treeChips=Object.entries(tree).map(([n,v])=>`<span class="specialtyChip">${esc(n)} ${stat(tree,n).toFixed(0)}</span>`).join("");
-    const capacityChips=Object.entries(caps).map(([n,v])=>`<span class="specialtyChip">${esc(n)} ${stat(caps,n).toFixed(0)}${v.specialty?` · ${esc(v.specialty)}`:""}</span>`).join("");
-    const techs=(s.techniques||[]).map(t=>`<span class="specialtyChip">N${t.level} · ${esc(t.name)}</span>`).join("");
-    const donesNames=Object.fromEntries(CHARACTER_ELEMENTS.map((k,i)=>[k,(uc.donesNames||CHARACTER_ELEMENTS)[i]||k]));
-    const dones=Object.entries(elements).map(([n,v])=>`<span class="specialtyChip">${esc(donesNames[n]||n)} ${stat(elements,n).toFixed(0)}</span>`).join("");
-    return `<article class="dashboardCharacterSheet"><div class="profileHero compact"><div class="profilePortrait"><div>VROL</div></div><div class="profileIdentity"><span class="tag">${esc(c.status)} · ${esc(c.universeName||"Universo")}</span><h2>${esc(c.name)}</h2><p>Edad inicial: ${esc(c.age||p.age||"—")}</p><small>Código: ${esc(c.characterCode)}</small><p>${esc(c.description||"Sin descripción registrada.")}</p></div></div><div class="derivedGrid"><div class="derivedCard"><span>Salud</span><b>${s.derived?.health??100}</b></div><div class="derivedCard"><span>${esc(uc.energyName||"Energía")}</span><b>${s.derived?.energy??100}</b></div><div class="derivedCard"><span>Iniciativa</span><b>${s.derived?.initiative??0}</b></div><div class="derivedCard"><span>Alerta Natural</span><b>${s.derived?.naturalAlert??0}</b></div><div class="derivedCard"><span>EXP Disponible</span><b>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</b></div></div><section class="profileSection"><div class="profileSectionHead"><h3>Capacidades Principales</h3><span>Perfil actual</span></div><div class="specialtyChips">${chips||"—"}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Talentos y Conocimientos</h3><span>Perfil actual</span></div><div class="specialtyChips">${capacityChips||"—"}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Árbol de Energía</h3><span>Perfil actual</span></div><div class="specialtyChips">${treeChips||"—"}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>${esc(uc.donesCategoryName||"Dones")}</h3><span>Perfil actual</span></div><div class="specialtyChips">${dones||"—"}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Técnicas y Habilidades</h3><span>${(s.techniques||[]).length}</span></div><div class="specialtyChips">${techs||"Sin técnicas adquiridas."}</div></section><div class="formActions"><button class="btn primary" onclick="characterEditor('${esc(c.id)}')">Abrir ficha completa</button></div></article>`;
+    const pending=Number(p.experienceAvailable||0)>0;
+    return `<article class="dashboardCharacterShortcut"><div class="shortcutIdentity"><span class="tag">${esc(c.universeName||"Universo")}</span><h3>${esc(c.name)}</h3><small>Edad ${esc(p.age||"—")} · ${esc(c.characterCode)}</small></div><div class="shortcutMeta"><span>EXP disponible</span><b class="${pending?"xpPending":""}">${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</b></div><div class="shortcutActions"><button class="btn primary" onclick="openCharacterSheetById('${esc(c.id)}')">Ver ficha</button><button class="btn ghost" onclick="characterEditor('${esc(c.id)}')">Editar</button></div></article>`;
   }).join("");
-  $("#content").innerHTML=head("Inicio","Resumen de tu actividad y tus personajes.")+`<div class="kpis">${Object.entries(d.stats||{}).map(([k,v])=>`<div class="kpi"><strong>${v}</strong><span>${esc(k)}</span></div>`).join("")}</div><div class="notice"><b>Tu identidad:</b> ${esc(currentUser.role)} · Player Level ${currentUser.playerLevel} · GM Level ${currentUser.gmLevel}<br><small>ADMIN, GM y PLAYER pueden poseer personajes. El rol mantiene sus permisos, pero la propiedad del personaje se gestiona como jugador.</small></div><section class="profileSection dashboardCharactersSection"><div class="profileSectionHead"><h2>Mis personajes</h2><span>${sheets.length} personaje(s)</span></div>${cards||`<div class="empty">Todavía no tienes personajes. Puedes crear uno desde <b>Personajes</b>.</div>`}</section>`;
+  $("#content").innerHTML=head("Inicio","Accesos rápidos a tus personajes y actividad.")+`<div class="kpis">${Object.entries(d.stats||{}).map(([k,v])=>`<div class="kpi"><strong>${v}</strong><span>${esc(k)}</span></div>`).join("")}</div><div class="notice"><b>Tu identidad:</b> ${esc(currentUser.role)} · Player Level ${currentUser.playerLevel} · GM Level ${currentUser.gmLevel}<br><small>ADMIN, GM y PLAYER pueden poseer personajes. La propiedad se gestiona como jugador.</small></div><section class="profileSection dashboardCharactersSection"><div class="profileSectionHead"><h2>Mis personajes</h2><span>${sheets.length} personaje(s)</span></div><div class="dashboardCharacterShortcuts">${cards||`<div class="empty">Todavía no tienes personajes. Puedes crear uno desde <b>Personajes</b>.</div>`}</div></section>`;
 }
 function draw(view,d){
  if(view==="dashboard")return $("#content").innerHTML=head("Panel VROL","Resumen de tu actividad y permisos.")+`<div class="kpis">${Object.entries(d.stats).map(([k,v])=>`<div class="kpi"><strong>${v}</strong><span>${esc(k)}</span></div>`).join("")}</div><div class="notice"><b>Tu identidad:</b> ${esc(currentUser.role)} · Player Level ${currentUser.playerLevel} · GM Level ${currentUser.gmLevel}</div>`;
@@ -238,37 +257,73 @@ function gmOptionsHtml(selected=""){
   return `<label>Responsable principal<select name="primaryGMUsername"><option value="">Por definir</option>${options.map(g=>`<option value="${esc(g.username)}" ${String(g.username)===String(selected)?"selected":""}>${esc(g.username)} · ${esc(g.role||"GM")}${g.role==="GM"?" · Nivel "+esc(g.gmLevel):""}</option>`).join("")}</select></label>`;
 }
 function universeForm(){
-  $("#content").innerHTML=head("Nuevo universo","Admin puede crear libremente. GM requiere el nivel configurado.")+`<form id="uf" class="formGrid">
+  const dons=CHARACTER_ELEMENTS;
+  const q6Defaults=[["1er Don","2do Don","3er Don","4to Don"],["5to Don","6to Don","7mo Don","8vo Don"],["9no Don","10mo Don","1er Don","2do Don"],["3er Don","4to Don","5to Don","6to Don"]];
+  $("#content").innerHTML=head("Nuevo universo","ADMIN puede crear universos y configurar su lenguaje propio.")+`<form id="uf" class="formGrid">
   ${field("Nombre","name")}
   ${gmOptionsHtml()}
   <label>Imagen del universo (URL)<input name="imageUrl" type="url" placeholder="https://..." ></label>
   <label>Nombre visible de Energía<input name="energyName" value="Energía" placeholder="Energía"></label>
-  <label>Nombre visible de Técnica<input name="techniqueName" value="Técnica" placeholder="Técnica"></label>
-  <label>Nombre de la categoría de Dones<input name="donesCategoryName" value="Dones" placeholder="Elementos, Dones, Afinidades..." ></label>
-  <div class="full"><div class="profileSectionHead"><h3>Nombres de las 10 características de Dones</h3><span>Personalizables por universo</span></div><div class="formGrid compact">${CHARACTER_ELEMENTS.map((n,i)=>`<label>${esc(n)}<input name="donesName${i}" value="${esc(n)}"></label>`).join("")}</div></div>
+  <label>Nombre visible de Habilidad<input name="techniqueName" value="Habilidad" placeholder="Habilidad"></label>
+  <label>Nombre de la categoría de Dones<input name="donesCategoryName" value="Dones" placeholder="Dones"></label>
+  <div class="full"><div class="profileSectionHead"><h3>Nombres de las 10 características de Dones</h3><span>Genéricos por defecto · personalizables por universo</span></div><div class="formGrid compact">${dons.map((n,i)=>`<label>${esc(n)}<input name="donesName${i}" value="${esc(n)}"></label>`).join("")}</div></div>
+  <div class="full"><div class="profileSectionHead"><h3>Pregunta 6 · Dones</h3><span>Editable por universo</span></div><label class="full">Pregunta<textarea name="q6Title" rows="2">¿Qué tipo de dones te gustaría poseer?</textarea></label><div class="interviewConfigGrid">${Array.from({length:4},(_,r)=>`<div class="interviewConfigRow"><b>Opción ${r+1}</b>${[0,1,2,3].map(c=>`<label>${[30,27,23,20][c]}%<input name="q6_${r}_${c}" value="${esc(q6Defaults[r][c]||dons[c])}"></label>`).join("")}</div>`).join("")}</div></div>
   <label class="full">Descripción<textarea name="description"></textarea></label>
   <div class="full formActions"><button class="btn primary">Crear universo</button></div></form>`;
-  $("#uf").onsubmit=async e=>{e.preventDefault();try{const fd=formData(e.target);fd.donesNames=CHARACTER_ELEMENTS.map((_,i)=>fd["donesName"+i]);await api("createUniverse",fd);navigate("universes");loadPublic()}catch(x){alert(x.message)}}}
+  $("#uf").onsubmit=async e=>{e.preventDefault();try{const fd=formData(e.target);fd.donesNames=dons.map((_,i)=>fd["donesName"+i]);fd.interviewQ6={title:fd.q6Title,choices:Array.from({length:4},(_,r)=>({no:r+1,dones:[0,1,2,3].map(c=>fd[`q6_${r}_${c}`])}))};await api("createUniverse",fd);navigate("universes");loadPublic()}catch(x){alert(x.message)}}}
+
 async function editUniverse(id){
-  const r=await api("getUniverse",{id}),u=r.data;
-  $("#content").innerHTML=head("Administrar universo",esc(u.name))+`<form id="uf" class="formGrid">
-  ${gmOptionsHtml(u.primaryGMUsername)}
-  <label>Imagen del universo (URL)<input name="imageUrl" type="url" value="${esc(u.imageUrl||"")}" placeholder="https://..." ></label>
-  <label>Nombre visible de Energía<input name="energyName" value="${esc(u.energyName||"Energía")}"></label>
-  <label>Nombre visible de Técnica<input name="techniqueName" value="${esc(u.techniqueName||"Técnica")}"></label>
-  <label>Nombre de la categoría de Dones<input name="donesCategoryName" value="${esc(u.donesCategoryName||"Dones")}"></label>
-  <div class="full"><div class="profileSectionHead"><h3>Nombres de las 10 características de Dones</h3><span>Personalizables por universo</span></div><div class="formGrid compact">${CHARACTER_ELEMENTS.map((n,i)=>`<label>${esc(n)}<input name="donesName${i}" value="${esc((u.donesNames||CHARACTER_ELEMENTS)[i]||n)}"></label>`).join("")}</div></div>
-  <label>Estado<select name="status"><option>ACTIVE</option><option>INACTIVE</option></select></label>
-  <label class="full">Descripción<textarea name="description">${esc(u.description||"")}</textarea></label>
-  <div class="full formActions"><button class="btn primary">Guardar cambios</button><button type="button" class="btn" onclick="deleteUniverse('${u.id}')">Eliminar</button></div></form>`;
-  $("#uf").elements.status.value=u.status;
-  $("#uf").onsubmit=async e=>{e.preventDefault();try{const fd=formData(e.target);fd.donesNames=CHARACTER_ELEMENTS.map((_,i)=>fd["donesName"+i]);await api("updateUniverse",{id,...fd});navigate("universes");loadPublic()}catch(x){alert(x.message)}}}
+  try{
+    const r=await api("getUniverse",{id});
+    const u=r.data;
+    const dons=u.donesNames||CHARACTER_ELEMENTS;
+    const q6=u.interviewQ6||{title:"¿Qué tipo de dones te gustaría poseer?",choices:[]};
+    const q6Rows=Array.from({length:4},(_,row)=>{
+      const vals=(q6.choices&&q6.choices[row]&&q6.choices[row].dones)||[];
+      return `<div class="interviewConfigRow"><b>Opción ${row+1}</b>${[0,1,2,3].map(col=>`<label>${[30,27,23,20][col]}%<input name="q6_${row}_${col}" value="${esc(vals[col]||dons[col]||CHARACTER_ELEMENTS[col])}"></label>`).join("")}</div>`;
+    }).join("");
+    const gmList=(u.assignedGMs||[]).map(g=>`<div class="dataRow"><div class="main"><b>${esc(g.username)}</b><small>GM autorizado para mesas y cambios del universo.</small></div><button class="btn ghost" onclick="manageUniverseGMUI('${esc(u.id)}','REMOVE','${esc(g.username)}')">Quitar</button></div>`).join("");
+    $("#content").innerHTML=head("Administrar universo",esc(u.name),`<button class="btn ghost" onclick="navigate('universes')">← Volver</button>`)+`
+      <form id="uf" class="formGrid">
+        ${gmOptionsHtml(u.primaryGMUsername)}
+        <label>Imagen del universo (URL)<input name="imageUrl" type="url" value="${esc(u.imageUrl||"")}" placeholder="https://..."></label>
+        <label>Nombre visible de Energía<input name="energyName" value="${esc(u.energyName||"Energía")}"></label>
+        <label>Nombre visible de Habilidad<input name="techniqueName" value="${esc(u.techniqueName||"Habilidad")}"></label>
+        <label>Nombre de la categoría de Dones<input name="donesCategoryName" value="${esc(u.donesCategoryName||"Dones")}"></label>
+        <div class="full"><div class="profileSectionHead"><h3>Nombres de las 10 características de Dones</h3><span>El universo define su propio lenguaje</span></div><div class="formGrid compact">${CHARACTER_ELEMENTS.map((n,i)=>`<label>${esc(n)}<input name="donesName${i}" value="${esc(dons[i]||n)}"></label>`).join("")}</div></div>
+        <div class="full"><div class="profileSectionHead"><h3>Pregunta 6 · Dones</h3><span>Editable para este universo</span></div><label class="full">Pregunta<textarea name="q6Title" rows="2">${esc(q6.title||"¿Qué tipo de dones te gustaría poseer?")}</textarea></label><div class="interviewConfigGrid">${q6Rows}</div></div>
+        <label>Estado<select name="status"><option>ACTIVE</option><option>INACTIVE</option></select></label>
+        <label class="full">Descripción<textarea name="description">${esc(u.description||"")}</textarea></label>
+        <div class="full formActions"><button class="btn primary">Guardar cambios</button><button type="button" class="btn" onclick="deleteUniverse('${esc(u.id)}')">Eliminar</button></div>
+      </form>
+      <section class="editorCard"><div class="profileSectionHead"><h3>GMs autorizados para este universo</h3><span>ADMIN · narrar, crear mesas y operar a nivel GM</span></div>
+        <div class="formGrid compact"><label>GM<select id="universeGMSelect">${(state.universeGMOptions||[]).map(g=>`<option value="${esc(g.username)}">${esc(g.username)} · ${esc(g.role)} · GM ${esc(g.gmLevel)}</option>`).join("")}</select></label><div class="formActions"><button type="button" class="btn primary" onclick="manageUniverseGMUI('${esc(u.id)}','ADD')">+ Añadir GM</button></div></div>
+        <div id="universeGMList" class="dataList">${gmList||`<div class="empty">No hay GMs adicionales asignados.</div>`}</div>
+      </section>`;
+    $("#uf").elements.status.value=u.status;
+    $("#uf").onsubmit=async function(e){
+      e.preventDefault();
+      try{
+        const fd=formData(e.target);
+        fd.donesNames=CHARACTER_ELEMENTS.map((_,i)=>fd["donesName"+i]);
+        fd.interviewQ6={title:fd.q6Title,choices:Array.from({length:4},(_,row)=>({no:row+1,dones:[0,1,2,3].map(col=>fd[`q6_${row}_${col}`])}))};
+        await api("updateUniverse",{id,...fd});
+        navigate("universes");
+        loadPublic();
+      }catch(x){alert(x.message);}
+    };
+  }catch(e){alert(e.message);}
+}
+function manageUniverseGMUI(universeId,mode,username){
+  const user=username||$("#universeGMSelect")?.value;if(!user)return alert("Selecciona un GM.");
+  (async()=>{try{await api("manageUniverseGM",{universeId,username:user,mode});alert(mode==="ADD"?"GM añadido al universo.":"GM retirado del universo.");editUniverse(universeId)}catch(e){alert(e.message)}})();
+}
 async function deleteUniverse(id){if(confirm("Se marcará como eliminado y se conservará el registro.")){await api("deleteUniverse",{id});navigate("universes");loadPublic()}}
 function characterForm(){
   const players=state.characterPlayers||[], universes=state.characterUniverses||[];
   const isPlayer=currentUser.role==="PLAYER";
   const playerField=isPlayer?`<div class="notice full">Jugador: <b>${esc(currentUser.username)}</b>. En VROL, ADMIN, GM y PLAYER pueden ser propietarios/jugadores de personajes. JO permite un solo personaje por jugador dentro de cada universo.</div>`:`<label>Jugador<select name="playerUsername"><option value="${esc(currentUser.username)}">${esc(currentUser.username)} · ${esc(currentUser.role)} (yo)</option>${players.filter(p=>String(p.username)!==String(currentUser.username)).map(p=>`<option value="${esc(p.username)}">${esc(p.username)} · ${esc(p.role||"PLAYER")}</option>`).join("")}</select></label>`;
-  $("#content").innerHTML=head("Crear personaje","La creación normal comienza inmediatamente con la entrevista de creación.")+`<form id="cf" class="formGrid">${playerField}<label>Universo<select name="universeId" required><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("")}</select></label><div class="full notice"><b>Importante:</b> al continuar se reservará tu único personaje para este universo y comenzarás directamente la entrevista. La edad, identidad, EXP inicial y perfil genético se definirán dentro de la entrevista.</div><div class="full formActions"><button class="btn primary">Comenzar entrevista de creación</button></div></form>`;
+  $("#content").innerHTML=head("Crear personaje","La creación normal comienza inmediatamente con la entrevista de creación.")+`<form id="cf" class="formGrid">${playerField}<label>Universo<select name="universeId" required><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(preselectedUniverse)?"selected":""}>${esc(u.name)}</option>`).join("")}</select></label><div class="full notice"><b>Importante:</b> al continuar se reservará tu único personaje para este universo y comenzarás directamente la entrevista. La edad, identidad, EXP inicial y perfil genético se definirán dentro de la entrevista.</div><div class="full formActions"><button class="btn primary">Comenzar entrevista de creación</button></div></form>`;
   $("#cf").onsubmit=async e=>{e.preventDefault();try{const fd=formData(e.target);fd.draft=true;const r=await api("createCharacter",fd);characterEditor(r.id)}catch(x){alert(x.message)}};
 }
 
@@ -281,7 +336,7 @@ async function advancedCharacterForm(){
   const treeRows=CHARACTER_TREE.map(n=>`<label class="adminXpRow limitRow"><span>${esc(n)}<small>Límite genético</small></span><input class="creationLimitInput" data-limit-cat="tree" data-limit-target="${esc(n)}" type="number" min="0" max="10" step="1" value="8"></label>`).join('');
   const html=head("Creador avanzado","ADMIN · creación sin entrevista y con límites personalizados.",`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`<section class="editorCard adminAdvancedCard"><div class="profileSectionHead"><h3>Creación administrativa</h3><span>ADMIN · puede personalizar límites</span></div><div class="formGrid compact"><label>Nombre<input id="advName"></label><label>Edad inicial<select id="advAge">${Array.from({length:41},(_,i)=>i+10).map(a=>`<option value="${a}">${a} años · ${creationExpText(a)} EXP</option>`).join('')}</select></label><label>Jugador<select id="advPlayer"><option value="">Seleccionar jugador...</option>${players.map(p=>`<option value="${esc(p.username)}">${esc(p.username)}</option>`).join('')}</select></label><label>Universo<select id="advUniverse"><option value="">Seleccionar universo...</option>${universes.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('')}</select></label><label class="full">Descripción<textarea id="advDescription"></textarea></label></div>
   <section class="profileSection"><div class="profileSectionHead"><h3>Límites genéticos de creación</h3><span id="limit48Status">48 / 48 puntos</span></div><p class="muted">Por defecto cada grupo suma 48 puntos. ADMIN puede definir una distribución personalizada. Activar “Romper 48” permite personajes no humanos o excepcionales y habilita hasta 60 puntos.</p><label class="choiceCard"><input id="advBreak48" type="checkbox" onchange="updateAdvancedLimitTotals()"><span><b>Romper límite genético de 48</b><small>Solo ADMIN · permite 49–60 puntos y elimina el tope de 4 puntos por objetivo durante la creación avanzada.</small></span></label><div class="limitGrid"><div><h4>Capacidades Principales</h4><div class="adminXpGrid">${traitRows}</div><strong id="traitLimitTotal">48 / 48</strong></div><div><h4>Árbol de Energía</h4><div class="adminXpGrid">${treeRows}</div><strong id="treeLimitTotal">48 / 48</strong></div></div></section>
-  <div class="xpCounterCard"><span>EXP total asignada</span><strong id="advXpTotal">0 EXP</strong><small>Se actualiza mientras asignas EXP.</small></div><div class="adminXpGrid">${rows}</div><section class="profileSection"><div class="profileSectionHead"><h3>Técnicas y Habilidades avanzadas</h3><span>Creación administrativa</span></div><div id="advSkills"></div><button type="button" class="btn" onclick="addAdvancedSkillRow()">+ Técnica / Habilidad</button></section><div class="formActions"><button class="btn primary" onclick="submitAdvancedCharacter()">Crear personaje avanzado</button></div></section>`;
+  <div class="xpCounterCard"><span>EXP total asignada</span><strong id="advXpTotal">0 EXP</strong><small>Se actualiza mientras asignas EXP.</small></div><div class="adminXpGrid">${rows}</div><section class="profileSection"><div class="profileSectionHead"><h3>Habilidades avanzadas</h3><span>Creación administrativa</span></div><div id="advSkills"></div><button type="button" class="btn" onclick="addAdvancedSkillRow()">+ Técnica / Habilidad</button></section><div class="formActions"><button class="btn primary" onclick="submitAdvancedCharacter()">Crear personaje avanzado</button></div></section>`;
   $("#content").innerHTML=html;
   document.querySelectorAll('.adminXpInput').forEach(el=>el.addEventListener('input',updateAdvancedXpTotal));
   document.querySelectorAll('.creationLimitInput').forEach(el=>el.addEventListener('input',updateAdvancedLimitTotals));
@@ -352,24 +407,31 @@ const CHARACTER_SPECIALTIES={
 };
 const CHARACTER_TREE=["Poder","Forma","Cantidad","Rapidez","Distancia","Efecto"];
 const TECHNIQUE_TREE_BASE=["Poder","Forma","Cantidad","Rapidez","Distancia"];
-const CHARACTER_ELEMENTS=["Material","Inmaterial","Especial","Mixto","Liberado","Agua","Fuego","Rayo","Tierra","Viento"];
+const CHARACTER_ELEMENTS=["1er Don","2do Don","3er Don","4to Don","5to Don","6to Don","7mo Don","8vo Don","9no Don","10mo Don"];
 
 function expView(exp){const n=Math.max(0,Math.min(1000,Number(exp)||0));return {exp:n,domain:Math.round(n/10),base:Math.min(10,Math.floor(n/100))};}
 function domainBar(domain){return `<div class="domainBar"><span style="width:${Math.max(0,Math.min(100,Number(domain)||0))}%"></span></div>`}
-function characterStatCard(name,obj,specialty="",withSpecialty=false,dataKey=""){
-  const v=expView(obj?.exp||0);
-  return `<div class="profileStat"><div class="profileStatName">${esc(name)}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span></div>${domainBar(v.domain)}${withSpecialty?`<div class="inlineSpecialties"><span>Especialidad</span><select class="specialtySelect" data-capacity="${esc(dataKey||name)}"><option value="">Sin especialidad</option>${(CHARACTER_SPECIALTIES[name]||[]).map(x=>`<option ${String(x)===String(specialty)?"selected":""}>${esc(x)}</option>`).join("")}</select></div>`:""}</div>`;
+function lifeBar(current,total){
+  const t=Math.max(0,Number(total||0)),c=Math.max(0,Math.min(t,Number(current||0))),pct=t?Math.round(c/t*100):0;
+  return `<div class="lifeBar"><span style="width:${pct}%"></span></div><small class="lifeMeta">${c} / ${t} · ${pct}%</small>`;
 }
-function characterSection(title,items,map,specialties=false,displayNames={}){return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>EXP 0–1000 · 10 EXP por compra</span></div><div class="profileStats">${items.map(n=>characterStatCard(displayNames[n]||n,map?.[n],map?.[n]?.specialty||"",specialties,n)).join("")}</div></section>`}
+function characterStatCard(name,obj,specialty="",withSpecialty=false,dataKey="",limit=null,editableId=""){
+  const v=expView(obj?.exp||0),base=v.base,selected=Array.isArray(obj?.specialties)?obj.specialties:(specialty?[specialty]:[]);
+  const opts=CHARACTER_SPECIALTIES[name]||[],thresholds=[3,5,7,9];
+  const specialtyHtml=withSpecialty?`<div class="inlineSpecialties"><span>Especialidades · desbloqueo 3 / 5 / 7 / 9</span><div class="specialtyOptions">${opts.map((x,i)=>{const unlocked=base>=3,isSel=selected.includes(x);return `<button type="button" class="specialtyOption ${isSel?"selected":""} ${unlocked?"":"locked"}" data-capacity="${esc(dataKey||name)}" ${unlocked&&editableId?`onclick="toggleSpecialtyUI('${esc(editableId)}','${esc(dataKey||name)}','${esc(x)}',this)"`:"disabled"} title="${unlocked?"Disponible":"Requiere 3 puntos base"}>${esc(x)}</button>`}).join("")}</div></div>`:"";
+  return `<div class="profileStat"><div class="profileStatName"><span>${esc(name)}</span>${limit!==null?`<b class="statLimit">Límite ${limit}</b>`:""}</div><div class="profileStatValue"><b>${v.base}</b><span>${v.domain}%</span><small>${v.exp.toLocaleString("es-CL")} EXP</small></div>${domainBar(v.domain)}${specialtyHtml}</div>`;
+}
+function characterSection(title,items,map,specialties=false,displayNames={},limits={},editableId=""){
+  const totalExp=items.reduce((n,k)=>n+Number(map?.[k]?.exp||0),0);
+  return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(title)}</h3><span>EXP invertida: ${totalExp.toLocaleString("es-CL")}</span></div><div class="profileStats">${items.map(n=>characterStatCard(displayNames[n]||n,map?.[n],map?.[n]?.specialty,specialties,n,limits?.[n]??null,editableId)).join("")}</div></section>`;
+}
 function creationExpText(age){
-  const a=Math.max(10,Math.min(50,Number(age)||10));
-  const rows={10:10000,20:18000,30:24000,40:28000,50:30000};
-  const pts=[10,20,30,40,50]; let lo=10,hi=50;
-  for(let i=0;i<pts.length;i++){if(pts[i]<=a)lo=pts[i];if(pts[i]>=a){hi=pts[i];break;}}
+  const a=Math.max(10,Math.min(50,Number(age)||10)),rows={10:10000,20:14000,30:17000,40:19000,50:20000},pts=[10,20,30,40,50];
+  let lo=10,hi=50;for(let i=0;i<pts.length;i++){if(pts[i]<=a)lo=pts[i];if(pts[i]>=a){hi=pts[i];break;}}
   const total=lo===hi?rows[lo]:Math.round(rows[lo]+((a-lo)/(hi-lo))*(rows[hi]-rows[lo]));
   return total.toLocaleString("es-CL");
 }
-function categoryLabel(k,universeConfig={}){return ({core:"Salud / Energía / Capacidades Principales",talents:"Talentos",knowledge:"Conocimientos",tree:"Árbol de Energía",elements:(universeConfig.donesCategoryName||"Dones"),skills:"Técnicas y Habilidades"})[k]||k}
+function categoryLabel(k,universeConfig={}){return ({core:"Salud / Energía / Capacidades Principales",talents:"Talentos",knowledge:"Conocimientos",tree:"Árbol de Energía",elements:(universeConfig.donesCategoryName||"Dones"),skills:"Habilidades"})[k]||k}
 function characterEditor(id){
   (async()=>{
     try{
@@ -390,31 +452,31 @@ function characterEditor(id){
         </section>`;
       const uc=d.universeConfig||{};
       if(!p.creationComplete){
-        const ageOptions=Array.from({length:41},(_,i)=>i+10).map(a=>`<option value="${a}" ${Number(p.age)===a?"selected":""}>${a} años · ${creationExpText(a)} EXP total · ${(Number(creationExpText(a).replace(/\./g,'').replace(/,/g,''))-4000).toLocaleString("es-CL")} EXP libres</option>`).join("");
-        html+=`<section class="editorCard interviewCard"><div class="profileSectionHead"><h3>Entrevista de Creación</h3><span>Paso 1 · Identidad y perfil natural</span></div><p class="muted">La creación normal comienza con esta entrevista. Primero establecerás la identidad de tu personaje y su edad; después responderás las 9 preguntas de Seiran. La edad determina tu presupuesto de EXP y tus respuestas determinan tus límites genéticos.</p><div class="formGrid compact interviewIdentity"><label>Nombre del personaje<input id="interviewName" value="${esc(c.name==="Sin nombre"?"":c.name)}" required></label><label>Edad inicial<select id="interviewAge">${ageOptions}</select><small>EXP total: <b id="interviewExpTotal">${Number(p.creationExp||10000).toLocaleString("es-CL")}</b> · EXP libres: <b id="interviewExpFree">${Number(p.freeCreationExp||6000).toLocaleString("es-CL")}</b></small></label><label>Origen<input id="interviewOrigin" value="${esc(c.origin||"")}" placeholder="Origen, lugar o procedencia"></label><label>Personalidad<input id="interviewPersonality" value="${esc(c.personality||"")}" placeholder="Rasgos principales de personalidad"></label><label class="full">Apariencia<textarea id="interviewAppearance" placeholder="Descripción física y elementos visuales importantes">${esc(c.appearance||"")}</textarea></label><label class="full">Motivación inicial<textarea id="interviewMotivation" placeholder="Qué busca, qué desea conseguir o qué lo mueve">${esc(c.motivation||"")}</textarea></label><label class="full">Descripción / historia inicial<textarea id="interviewDescription" placeholder="Una breve descripción narrativa del personaje">${esc(c.description||"")}</textarea></label></div><div class="profileSection"><div class="profileSectionHead"><h3>Perfil natural</h3><span>Se determina al finalizar las respuestas</span></div><p class="muted">Las respuestas establecerán una distribución genética de 48/60 puntos entre Fuerza, Velocidad, Resistencia, Inteligencia, Voluntad y Aura, y su equivalente en el Árbol de la Energía.</p></div>${interview.map(q=>`<fieldset class="interviewQuestion"><legend>${q.no}. ${esc(q.title)}</legend><p>${esc(q.text)}</p><div class="choiceGrid">${q.choices.map(ch=>`<label class="choiceCard"><input type="radio" name="q${q.no}" value="${ch.no}"><span><b>${esc(ch.text)}</b></span></label>`).join("")}</div></fieldset>`).join("")}<div class="formActions"><button class="btn primary" onclick="submitCharacterInterview('${c.id}')">Finalizar entrevista y continuar</button></div></section>`;
+        const ageOptions=Array.from({length:41},(_,i)=>i+10).map(a=>`<option value="${a}" ${Number(p.age)===a?"selected":""}>${a} años · ${creationExpText(a)} EXP total · ${(Number(creationExpText(a).replace(/\./g,'').replace(/,/g,''))).toLocaleString("es-CL")} EXP libres</option>`).join("");
+        html+=`<section class="editorCard interviewCard"><div class="profileSectionHead"><h3>Entrevista de Creación</h3><span>Paso 1 · Identidad y perfil natural</span></div><p class="muted">La creación normal comienza con esta entrevista. Primero establecerás la identidad de tu personaje y su edad; después responderás las 6 preguntas de la entrevista. La edad determina tu presupuesto total. La entrevista determina límites genéticos y la distribución ponderada de la EXP de creación.</p><div class="formGrid compact interviewIdentity"><label>Nombre del personaje<input id="interviewName" value="${esc(c.name==="Sin nombre"?"":c.name)}" required></label><label>Edad inicial<select id="interviewAge">${ageOptions}</select><small>EXP total: <b id="interviewExpTotal">${Number(p.creationExp||10000).toLocaleString("es-CL")}</b> · EXP libres: <b id="interviewExpFree">${Number(p.freeCreationExp||p.creationExp||0).toLocaleString("es-CL")}</b></small></label><label>Origen<input id="interviewOrigin" value="${esc(c.origin||"")}" placeholder="Origen, lugar o procedencia"></label><label>Personalidad<input id="interviewPersonality" value="${esc(c.personality||"")}" placeholder="Rasgos principales de personalidad"></label><label class="full">Apariencia<textarea id="interviewAppearance" placeholder="Descripción física y elementos visuales importantes">${esc(c.appearance||"")}</textarea></label><label class="full">Motivación inicial<textarea id="interviewMotivation" placeholder="Qué busca, qué desea conseguir o qué lo mueve">${esc(c.motivation||"")}</textarea></label><label class="full">Descripción / historia inicial<textarea id="interviewDescription" placeholder="Una breve descripción narrativa del personaje">${esc(c.description||"")}</textarea></label></div><div class="profileSection"><div class="profileSectionHead"><h3>Perfil natural</h3><span>Se determina con la primera respuesta</span></div><p class="muted">La primera respuesta define los límites genéticos. Las preguntas siguientes distribuyen la EXP de creación según las ponderaciones del sistema VROL.</p></div>${interview.map(q=>`<fieldset class="interviewQuestion"><legend>${q.no}. ${esc(q.title)}</legend><p>${esc(q.text)}</p><div class="choiceGrid">${q.choices.map(ch=>`<label class="choiceCard"><input type="radio" name="q${q.no}" value="${ch.no}"><span><b>${esc(ch.text)}</b></span></label>`).join("")}</div></fieldset>`).join("")}<div class="formActions"><button class="btn primary" onclick="submitCharacterInterview('${c.id}')">Finalizar entrevista y continuar</button></div></section>`;
         html+=`</div>`;
         $("#content").innerHTML=html;
         const ageEl=$("#interviewAge");
-        const updateInterviewExp=()=>{const total=Number(creationExpText(ageEl.value).replace(/\./g,'').replace(/,/g,''));$("#interviewExpTotal").textContent=total.toLocaleString("es-CL");$("#interviewExpFree").textContent=Math.max(0,total-4000).toLocaleString("es-CL")};
+        const updateInterviewExp=()=>{const total=Number(creationExpText(ageEl.value).replace(/\./g,'').replace(/,/g,''));$("#interviewExpTotal").textContent=total.toLocaleString("es-CL");$("#interviewExpFree").textContent=total.toLocaleString("es-CL")};
         if(ageEl)ageEl.onchange=updateInterviewExp;
         updateInterviewExp();
         return;
       }
       html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Experiencia Disponible</h3><span>EXP ganada: ${Number(p.experienceEarned||0).toLocaleString("es-CL")}</span></div><div class="xpHero"><strong>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</strong><span>EXP Disponible</span></div><div class="xpPools">${Object.entries(d.categoryPools||{}).map(([k,v])=>`<div class="xpPool"><b>${esc(categoryLabel(k,uc))}</b><span>${v.remaining.toLocaleString("es-CL")} / ${v.pool.toLocaleString("es-CL")}</span><small>${Math.round(((v.pool-v.remaining)/(v.pool||1))*100)}% utilizado</small></div>`).join("")}</div></section>`;
       const lim=d.creationLimits||{}; const dh=d.derived?.health??100, de=d.derived?.energy??100; const limitsPending=!p.creationComplete && String(p.creationMode)!=="ADMIN_ADVANCED";
-      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Límites de creación y valores derivados</h3><span>${limitsPending?'Se determinan por la entrevista':(lim.override?'Límite genético personalizado / ADMIN':'Límite genético 48 puntos')}</span></div><div class="derivedGrid"><div class="derivedCard"><span>Salud máxima</span><b>${dh}</b><small>100 base + fórmula SUR · EXP Salud: ${Number(p.healthExp||0)}/1000</small></div><div class="derivedCard"><span>Energía máxima</span><b>${de}</b><small>100 base + fórmula SUR · EXP Energía: ${Number(p.energyExp||0)}/1000</small></div></div>${limitsPending?`<p class="muted">La entrevista de Seiran establecerá automáticamente los 48 puntos de los Capacidades Principales y los 48 puntos homólogos del Árbol de Energía.</p>`:`<div class="limitGrid"><div><h4>Capacidades · ${lim.traitTotal||48}/${lim.override?lim.traitTotal||48:48}</h4><div class="limitChips">${Object.entries(lim.traits||{}).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${v}</span>`).join('')}</div></div><div><h4>Árbol · ${lim.treeTotal||48}/${lim.override?lim.treeTotal||48:48}</h4><div class="limitChips">${Object.entries(lim.tree||{}).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${v}</span>`).join('')}</div></div></div>`}</section>`;
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Límites de creación y valores derivados</h3><span>${limitsPending?'Se determinan por la entrevista':(lim.override?'Límite genético personalizado / ADMIN':'Límite genético 48 puntos')}</span></div><div class="derivedGrid"><div class="derivedCard"><span>Salud máxima</span><b>${dh}</b><small>100 base + fórmula SUR · EXP Salud: ${Number(p.healthExp||0)}/1000</small></div><div class="derivedCard"><span>Energía máxima</span><b>${de}</b><small>100 base + fórmula SUR · EXP Energía: ${Number(p.energyExp||0)}/1000</small></div></div>${limitsPending?`<p class="muted">La primera pregunta establecerá automáticamente los 48 puntos de límites genéticos de las Capacidades Principales y sus 48 puntos homólogos del Árbol de la Energía.</p>`:`<div class="limitGrid"><div><h4>Capacidades · ${lim.traitTotal||48}/${lim.override?lim.traitTotal||48:48}</h4><div class="limitChips">${Object.entries(lim.traits||{}).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${v}</span>`).join('')}</div></div><div><h4>Árbol · ${lim.treeTotal||48}/${lim.override?lim.treeTotal||48:48}</h4><div class="limitChips">${Object.entries(lim.tree||{}).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${v}</span>`).join('')}</div></div></div>`}</section>`;
       if(!p.creationComplete){
-        html+=`<section class="editorCard interviewCard"><div class="profileSectionHead"><h3>Entrevista de Seiran</h3><span>Asignación inicial de EXP</span></div><p class="muted">El Príncipe Seiran te recibe como guerrero llegado desde otro universo. Tus respuestas determinan cómo se distribuye la experiencia inicial. La edad define el presupuesto total.</p><div id="interviewForm">${interview.map(q=>`<fieldset class="interviewQuestion"><legend>${q.no}. ${esc(q.title)}</legend><p>${esc(q.text)}</p><div class="choiceGrid">${q.choices.map(ch=>`<label class="choiceCard"><input type="radio" name="q${q.no}" value="${ch.no}"><span><b>${esc(ch.text)}</b></span></label>`).join("")}</div></fieldset>`).join("")}<div class="formActions"><button class="btn primary" onclick="submitCharacterInterview('${c.id}')">Finalizar entrevista y asignar ${Number(p.creationExp||0).toLocaleString("es-CL")} EXP</button></div></div></section>`;
+        html+=`<section class="editorCard interviewCard"><div class="profileSectionHead"><h3>Entrevista de Creación</h3><span>Distribución inicial de EXP</span></div><p class="muted">La entrevista es universal para cualquier universo. Tus respuestas determinan límites genéticos y distribución de la EXP inicial.</p><div id="interviewForm">${interview.map(q=>`<fieldset class="interviewQuestion"><legend>${q.no}. ${esc(q.title)}</legend><p>${esc(q.text)}</p><div class="choiceGrid">${q.choices.map(ch=>`<label class="choiceCard"><input type="radio" name="q${q.no}" value="${ch.no}"><span><b>${esc(ch.text)}</b></span></label>`).join("")}</div></fieldset>`).join("")}<div class="formActions"><button class="btn primary" onclick="submitCharacterInterview('${c.id}')">Finalizar entrevista y asignar ${Number(p.creationExp||0).toLocaleString("es-CL")} EXP</button></div></div></section>`;
       } else {
-        html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Comprar desarrollo</h3><span>Siempre en múltiplos de 10 EXP</span></div><div class="purchaseGrid"><label>Área<select id="xpCategory">${Object.keys(d.categoryPools||{}).map(k=>`<option value="${k}">${esc(categoryLabel(k,uc))}</option>`).join("")}</select></label><label>Objetivo<select id="xpTarget"></select></label><label>EXP a gastar<input id="xpAmount" type="number" min="10" step="10" value="10"></label><div class="formActions"><button class="btn primary" onclick="spendCharacterXP('${c.id}')">Comprar EXP</button></div></div><small class="muted">La EXP Disponible se reparte automáticamente por las proporciones 8/50, 8/50, 8/50, 6/50, 10/50 y 10/50.</small></section>`;
+        html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Comprar desarrollo</h3><span>Siempre en múltiplos de 10 EXP</span></div><div class="purchaseGrid"><label>Área<select id="xpCategory">${Object.keys(d.categoryPools||{}).map(k=>`<option value="${k}">${esc(categoryLabel(k,uc))}</option>`).join("")}</select></label><label>Objetivo<select id="xpTarget"></select></label><label>EXP a gastar<input id="xpAmount" type="number" min="10" step="10" value="10"></label><div class="formActions"><button class="btn primary" onclick="spendCharacterXP('${c.id}')">Comprar EXP</button></div></div><small class="muted">La entrevista reserva el 15% de la EXP total para Habilidades. El 85% restante se distribuye mediante sus seis preguntas y sus ponderaciones.</small></section>`;
       }
-      html+=characterSection("Capacidades Principales",CHARACTER_TRAITS,d.traits,false);
-      html+=characterSection("Talentos y Conocimientos",CHARACTER_CAPACITIES,d.capacities,true);
-      html+=characterSection("Árbol de Energía",CHARACTER_TREE,d.tree,false);
-      html+=characterSection("Elementos / Dones",CHARACTER_ELEMENTS,d.elements,false);
-      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Salud y Energía</h3><span>Área compartida con Capacidades Principales</span></div><div class="formGrid compact"><label>EXP Salud<input id="healthExp" type="number" min="0" max="1000" step="10" value="${Number(p.healthExp||0)}"></label><label>EXP Energía<input id="energyExp" type="number" min="0" max="1000" step="10" value="${Number(p.energyExp||0)}"></label></div><div class="formActions"><button class="btn" onclick="saveCharacterIdentity('${c.id}',true)">Guardar Salud / Energía</button></div></section>`;
-      if(currentUser.role==="ADMIN")html+=`<section class="editorCard adminDirectCard"><div class="profileSectionHead"><h3>Administración directa de EXP</h3><span>Solo ADMIN · sin límite global</span></div><p class="muted">Permite corregir o construir personajes avanzados directamente. Cada objetivo conserva el máximo de 1.000 EXP.</p><div class="adminXpGrid">${CHARACTER_TRAITS.concat(["Salud","Energía"]).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="core" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.traits||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(0,8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="talents" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="knowledge" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_TREE.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="tree" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.tree||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_ELEMENTS.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="elements" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.elements||{})[n]?.exp||0)}"></label>`).join("")}</div><section class="profileSection"><div class="profileSectionHead"><h3>Técnicas y Habilidades existentes</h3><span>Edición directa ADMIN</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow adminSkillEdit"><input class="adminSkillName" data-id="${esc(sk.id)}" value="${esc(sk.name||"")}"><input class="adminSkillExp" data-id="${esc(sk.id)}" type="number" min="0" max="1000" step="10" value="${Number(sk.exp||0)}"></div>`).join("")||`<div class="empty">No hay técnicas ni habilidades existentes.</div>`}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Límites manuales</h3><span>ADMIN</span></div><label class="choiceCard"><input id="editBreak48" type="checkbox" ${lim.override?"checked":""}><span><b>Romper límite de 48</b><small>Permite 49–60 puntos por grupo.</small></span></label><div class="limitGrid"><div><h4>Capacidades</h4><div class="adminXpGrid">${CHARACTER_TRAITS.map(n=>`<label class="adminXpRow limitRow"><span>${esc(n)}</span><input class="editLimitInput" data-cat="traits" data-target="${esc(n)}" type="number" min="0" max="10" value="${Number(lim.traits?.[n]||8)}"></label>`).join("")}</div></div><div><h4>Árbol</h4><div class="adminXpGrid">${CHARACTER_TREE.map(n=>`<label class="adminXpRow limitRow"><span>${esc(n)}</span><input class="editLimitInput" data-cat="tree" data-target="${esc(n)}" type="number" min="0" max="10" value="${Number(lim.tree?.[n]||8)}"></label>`).join("")}</div></div></div></section><div class="formActions"><button class="btn primary" onclick="saveAdminCharacterStats('${c.id}')">Guardar EXP administrativa</button></div></section>`;
-      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Técnicas y Habilidades</h3><span>Desarrollo individual</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)}/1000 EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<div class="empty">Todavía no hay habilidades.</div>`}</div><div class="formGrid compact skillForm"><label>Nueva técnica / habilidad<input id="newSkillName" placeholder="Ej. Kenjutsu"></label><label>EXP inicial<input id="newSkillExp" type="number" min="10" max="1000" step="10" value="10"></label><div class="formActions"><button class="btn" onclick="addCharacterSkillUI('${c.id}')">Añadir técnica / habilidad</button></div></div></section>`;
+      html+=characterSection("Capacidades Principales",CHARACTER_TRAITS,d.traits,false,{},lim.traits||{},c.id);
+      html+=characterSection("Talentos",CHARACTER_CAPACITIES.slice(0,8),d.capacities,true,{},{} ,c.id);html+=characterSection("Conocimientos",CHARACTER_CAPACITIES.slice(8),d.capacities,true,{},{} ,c.id);
+      html+=characterSection("Árbol de la Energía",CHARACTER_TREE,d.tree,false,{},lim.tree||{},c.id);
+      html+=characterSection(uc.donesCategoryName||"Dones",CHARACTER_ELEMENTS,d.elements,false,Object.fromEntries(CHARACTER_ELEMENTS.map((k,i)=>[k,(uc.donesNames||CHARACTER_ELEMENTS)[i]||k])));
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Salud y ${esc(uc.energyName||"Energía")}</h3><span>Estado actual / total</span></div><div class="vitalsGrid"><div class="vitalCard"><div><span>Salud Actual / Total</span><b>${Number(d.vitals?.currentHealth??d.derived?.health??100)} / ${Number(d.derived?.health??100)}</b></div>${lifeBar(d.vitals?.currentHealth??d.derived?.health??100,d.derived?.health??100)}</div><div class="vitalCard"><div><span>${esc(uc.energyName||"Energía")} Actual / Total</span><b>${Number(d.vitals?.currentEnergy??d.derived?.energy??100)} / ${Number(d.derived?.energy??100)}</b></div>${lifeBar(d.vitals?.currentEnergy??d.derived?.energy??100,d.derived?.energy??100)}</div></div><div class="formGrid compact"><label>EXP Salud<input id="healthExp" type="number" min="0" max="1000" step="10" value="${Number(p.healthExp||0)}"></label><label>EXP ${esc(uc.energyName||"Energía")}<input id="energyExp" type="number" min="0" max="1000" step="10" value="${Number(p.energyExp||0)}"></label></div><div class="formActions"><button class="btn" onclick="saveCharacterIdentity('${c.id}',true)">Guardar Salud / ${esc(uc.energyName||"Energía")}</button></div></section>`;
+      if(currentUser.role==="ADMIN")html+=`<section class="editorCard adminDirectCard"><div class="profileSectionHead"><h3>Administración directa de EXP</h3><span>Solo ADMIN · sin límite global</span></div><p class="muted">Permite corregir o construir personajes avanzados directamente. Cada objetivo conserva el máximo de 1.000 EXP.</p><div class="adminXpGrid">${CHARACTER_TRAITS.concat(["Salud","Energía"]).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="core" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.traits||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(0,8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="talents" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_CAPACITIES.slice(8).map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="knowledge" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.capacities||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_TREE.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="tree" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.tree||{})[n]?.exp||0)}"></label>`).join("")}${CHARACTER_ELEMENTS.map(n=>`<label class="adminXpRow"><span>${esc(n)}</span><input class="directXpInput" data-cat="elements" data-target="${esc(n)}" type="number" min="0" max="1000" step="10" value="${Number((d.elements||{})[n]?.exp||0)}"></label>`).join("")}</div><section class="profileSection"><div class="profileSectionHead"><h3>Habilidades existentes</h3><span>Edición directa ADMIN</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow adminSkillEdit"><input class="adminSkillName" data-id="${esc(sk.id)}" value="${esc(sk.name||"")}"><input class="adminSkillExp" data-id="${esc(sk.id)}" type="number" min="0" max="1000" step="10" value="${Number(sk.exp||0)}"></div>`).join("")||`<div class="empty">No hay técnicas ni habilidades existentes.</div>`}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Límites manuales</h3><span>ADMIN</span></div><label class="choiceCard"><input id="editBreak48" type="checkbox" ${lim.override?"checked":""}><span><b>Romper límite de 48</b><small>Permite 49–60 puntos por grupo.</small></span></label><div class="limitGrid"><div><h4>Capacidades</h4><div class="adminXpGrid">${CHARACTER_TRAITS.map(n=>`<label class="adminXpRow limitRow"><span>${esc(n)}</span><input class="editLimitInput" data-cat="traits" data-target="${esc(n)}" type="number" min="0" max="10" value="${Number(lim.traits?.[n]||8)}"></label>`).join("")}</div></div><div><h4>Árbol</h4><div class="adminXpGrid">${CHARACTER_TREE.map(n=>`<label class="adminXpRow limitRow"><span>${esc(n)}</span><input class="editLimitInput" data-cat="tree" data-target="${esc(n)}" type="number" min="0" max="10" value="${Number(lim.tree?.[n]||8)}"></label>`).join("")}</div></div></div></section><div class="formActions"><button class="btn primary" onclick="saveAdminCharacterStats('${c.id}')">Guardar EXP administrativa</button></div></section>`;
+      html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Habilidades</h3><span>Desarrollo individual</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)}/1000 EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<div class="empty">Todavía no hay habilidades.</div>`}</div><div class="formGrid compact skillForm"><label>Nueva técnica / habilidad<input id="newSkillName" placeholder="Ej. Kenjutsu"></label><label>EXP inicial<input id="newSkillExp" type="number" min="10" max="1000" step="10" value="10"></label><div class="formActions"><button class="btn" onclick="addCharacterSkillUI('${c.id}')">Añadir técnica / habilidad</button></div></div></section>`;
       html+=renderTechniqueSection(c,d,uc);
       html+=`<section class="editorCard"><div class="profileSectionHead"><h3>Historial de experiencia</h3><span>${(d.xpLogs||[]).length} movimientos</span></div><div class="dataList compactList">${(d.xpLogs||[]).slice(-30).reverse().map(x=>`<div class="dataRow"><div class="main"><b>${esc(x.sourceType||"MOVIMIENTO")}</b><small>${esc(x.note||"")} · ${esc(x.category||"")}</small></div><span class="status">${Number(x.amount||0)>0?"+":""}${Number(x.amount||0)} EXP</span></div>`).join("")||`<div class="empty">Sin movimientos todavía.</div>`}</div></section>`;
       html+=`</div>`;
@@ -443,8 +505,16 @@ function saveCharacterSpecialties(id){
   const specialties=[...document.querySelectorAll('.specialtySelect')].map(x=>({capacity:x.dataset.capacity,specialty:x.value}));
   api("saveCharacterProfile",{id,specialties}).catch(e=>alert(e.message));
 }
+function toggleSpecialtyUI(characterId,capacity,specialty,button){
+  button.classList.toggle("selected");
+  const selected=[...document.querySelectorAll(`.specialtyOption[data-capacity="${CSS.escape(capacity)}"]`)].filter(x=>x.classList.contains("selected")).map(x=>x.textContent.trim());
+  const base=Number(button.closest(".profileStat")?.querySelector(".profileStatValue b")?.textContent||0);
+  const maxUnlocked=base>=9?4:base>=7?3:base>=5?2:base>=3?1:0;
+  if(selected.length>maxUnlocked){button.classList.toggle("selected");return alert("La capacidad permite hasta "+maxUnlocked+" especialidad(es) según su puntuación base.");}
+  api("saveCharacterProfile",{id:characterId,specialties:[{capacity,specialties:selected}]}).catch(e=>alert(e.message));
+}
 function submitCharacterInterview(id){
-  (async()=>{const cfg=state.characterConfig||{};const qs=cfg.interview||[];const answers=qs.map(q=>{const el=document.querySelector(`input[name="q${q.no}"]:checked`);return {questionNo:q.no,choiceNo:el?Number(el.value):0}});if(answers.some(x=>!x.choiceNo)){alert("Debes responder las 9 preguntas de la entrevista.");return}const name=$("#interviewName")?.value.trim();if(!name){alert("Debes indicar el nombre del personaje.");return}try{await api("applyCharacterInterview",{id,name,age:Number($("#interviewAge")?.value||10),origin:$("#interviewOrigin")?.value.trim(),appearance:$("#interviewAppearance")?.value.trim(),personality:$("#interviewPersonality")?.value.trim(),motivation:$("#interviewMotivation")?.value.trim(),description:$("#interviewDescription")?.value.trim(),answers});alert("Entrevista completada. El personaje ya puede continuar con su distribución de EXP.");characterEditor(id)}catch(e){alert(e.message)}})();
+  (async()=>{const cfg=state.characterConfig||{};const qs=cfg.interview||[];const answers=qs.map(q=>{const el=document.querySelector(`input[name="q${q.no}"]:checked`);return {questionNo:q.no,choiceNo:el?Number(el.value):0}});if(answers.some(x=>!x.choiceNo)){alert("Debes responder las 6 preguntas de la entrevista.");return}const name=$("#interviewName")?.value.trim();if(!name){alert("Debes indicar el nombre del personaje.");return}try{await api("applyCharacterInterview",{id,name,age:Number($("#interviewAge")?.value||10),origin:$("#interviewOrigin")?.value.trim(),appearance:$("#interviewAppearance")?.value.trim(),personality:$("#interviewPersonality")?.value.trim(),motivation:$("#interviewMotivation")?.value.trim(),description:$("#interviewDescription")?.value.trim(),answers});alert("Entrevista completada. El personaje ya puede continuar con su distribución de EXP.");characterEditor(id)}catch(e){alert(e.message)}})();
 }
 function setupXPTargets(d){
   const cat=$("#xpCategory"), target=$("#xpTarget"); if(!cat||!target)return;
@@ -459,20 +529,71 @@ function spendCharacterXP(id){
   (async()=>{try{const r=await api("spendCharacterExperience",{id,category:$("#xpCategory").value,target:$("#xpTarget").value,amount:Number($("#xpAmount").value||0)});alert("EXP asignada correctamente.");characterEditor(id)}catch(e){alert(e.message)}})();
 }
 async function openCharacterSheet(c){
-  try{const r=await api("getCharacterProfile",{id:c.id});const d=r.data,p=d.profile;const derivedHealth=Math.round((d.traits?.Resistencia?.exp||0)/100*(d.traits?.Aura?.exp||0)/100*10);const derivedEnergy=Math.round((d.traits?.Voluntad?.exp||0)/100*(d.traits?.Aura?.exp||0)/100*10);
-    const uc=d.universeConfig||{};
-    $("#content").innerHTML=head("Ficha de personaje",esc(c.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`<div class="characterSheet"><section class="quickRollCard"><div><span class="tag">TIRADAS RÁPIDAS</span><h3>Sistema de dados</h3><small>Usa expresiones como 1d10, 2d10+3 o 1d20-2.</small></div><div class="quickRollControls"><input id="quickDiceExpr" value="1d10" aria-label="Expresión de dado"><button class="btn primary" onclick="rollQuickDice()">Lanzar dado</button><b id="quickDiceResult">—</b></div></section><div class="profileHero"><div class="profilePortrait"><div>VROL</div></div><div class="profileIdentity"><span class="tag">PERSONAJE · ${esc(c.status)}</span><h2>${esc(c.name)}</h2><p>Edad inicial: ${p.age} · ${esc(c.universeName||"Universo")}</p><small>Código: ${esc(c.characterCode)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small><p class="profileHistory">${esc(c.description||"Sin historia registrada.")}</p></div></div><div class="derivedGrid"><div class="derivedCard"><span>Salud máxima</span><b>${d.derived?.health??derivedHealth}</b><small>EXP Salud: ${p.healthExp}/1000</small></div><div class="derivedCard"><span>${esc(uc.energyName||"Energía")} máxima</span><b>${d.derived?.energy??derivedEnergy}</b><small>EXP ${esc(uc.energyName||"Energía")}: ${p.energyExp}/1000</small></div><div class="derivedCard"><span>Iniciativa</span><b>${Number(d.derived?.initiative||0).toFixed(2).replace(/\.00$/,"")}</b><small>Velocidad + Inteligencia</small></div><div class="derivedCard"><span>Alerta Natural</span><b>${Number(d.derived?.naturalAlert||0).toFixed(2).replace(/\.00$/,"")}</b><small>Inteligencia + Alerta</small></div><div class="derivedCard"><span>EXP Disponible</span><b>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</b><small>EXP ganada: ${Number(p.experienceEarned||0).toLocaleString("es-CL")}</small></div></div>${characterSection("Capacidades Principales",CHARACTER_TRAITS,d.traits,false)}${characterSection("Talentos y Conocimientos",CHARACTER_CAPACITIES,d.capacities,true)}${characterSection("Árbol de Energía",CHARACTER_TREE,d.tree,false)}${characterSection(uc.donesCategoryName||"Dones",CHARACTER_ELEMENTS,d.elements,false,Object.fromEntries(CHARACTER_ELEMENTS.map((k,i)=>[k,(uc.donesNames||CHARACTER_ELEMENTS)[i]||k])))}${renderTechniqueSheetSection(d,uc)}<section class="profileSection"><div class="profileSectionHead"><h3>Técnicas y Habilidades</h3><span>${(d.skills||[]).length} habilidad(es)</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)} EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<span class="muted">Sin habilidades registradas.</span>`}</div></section><section class="profileSection"><div class="profileSectionHead"><h3>Especialidades seleccionadas</h3><span>Integradas en Talentos y Conocimientos</span></div><div class="specialtyChips">${Object.entries(d.capacities||{}).filter(([k,v])=>v.specialty).map(([k,v])=>`<span class="specialtyChip">${esc(k)}: ${esc(v.specialty)}</span>`).join("")||`<span class="muted">Sin especialidades seleccionadas.</span>`}</div></section></div>`;
-  }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
+  try{const r=await api("getCharacterProfile",{id:c.id});return openCharacterSheetData(r.data);}catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`;return;}
 }
-
-function renderTechniqueSection(c,d,uc){const techs=d.techniques||[];const p=d.profile||{};const isPlayer=currentUser.role==="PLAYER";const canGM=currentUser.role==="ADMIN"||currentUser.role==="GM";return `<section class="editorCard techniqueLibraryCard"><div class="profileSectionHead"><h3>${esc(uc.techniqueName||"Técnicas")} y Habilidades</h3><span>Biblioteca del universo · ${techs.length} disponible(s)</span></div><p class="muted">Nivel 1–5 · dominio máximo 100/200/300/400/500 EXP · precisión por dominio y hasta 1–5 efectos sobre el campo Efecto.</p><div class="techniqueList">${techs.map(t=>{const cfg=state.characterConfig?.techniqueLevels?.find(x=>Number(x.level)===Number(t.level))||{};const bought=t.owned&&Number(t.characterTechniqueExp||0)>0;return `<div class="techniqueCard"><div><span class="tag">NIVEL ${t.level}</span><h4>${esc(t.name)}</h4><p>${esc(t.description||"Sin descripción")}</p><small>${t.expMax} EXP · precisión +1 cada ${t.precisionStep} EXP · máximo ${t.maxEnergy} ${esc(uc.energyName||"Energía")} · ${t.maxEffects} efecto(s)</small></div><div class="techniqueActions">${isPlayer&&!bought?`<button class="btn primary" onclick="buyTechniqueUI('${c.id}','${t.id}')">Comprar · ${t.expMax} EXP</button>`:bought?`<span class="status">ADQUIRIDA</span>`:canGM?`<button class="btn ghost" onclick="assignTechniqueUI('${c.id}','${t.id}')">Asignar</button>`:`<span class="status">DISPONIBLE</span>`}</div></div>`}).join("")||`<div class="empty">No hay técnicas disponibles en este universo.</div>`}</div></section>`;}
+async function openCharacterSheetData(d){
+  const c=d.character,p=d.profile,uc=d.universeConfig||{},derived=d.derived||{},vitals=d.vitals||{};
+  const body=vitals.bodyHealth||{};
+  const core=d.traits||{},caps=d.capacities||{},tree=d.tree||{},elements=d.elements||{};
+  const talentNames=CHARACTER_CAPACITIES.slice(0,8),knowledgeNames=CHARACTER_CAPACITIES.slice(8);
+  const limitTraits=d.creationLimits?.traits||{},limitTree=d.creationLimits?.tree||{};
+  const traitOptions=CHARACTER_TRAITS.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  const secondOptions=[...talentNames,...knowledgeNames].map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  const bodyLabels={Cabeza:"Cabeza",BrazoIzquierdo:"Brazo izquierdo",BrazoDerecho:"Brazo derecho",Tronco:"Tronco",PiernaIzquierda:"Pierna izquierda",PiernaDerecha:"Pierna derecha"};
+  const bodyCards=Object.entries(bodyLabels).map(([k,label])=>{const b=body[k]||{current:0,total:0,percent:0};return `<div class="bodyHealthCard"><div><b>${esc(label)}</b><span>${b.percent}% de Salud</span></div>${lifeBar(b.current,b.total)}</div>`}).join("");
+  $("#content").innerHTML=head("Ficha de personaje",esc(c.name),`<button class="btn ghost" onclick="navigate('characters')">← Volver</button>`)+`<div class="characterSheet">
+    <section class="combinedRollCard"><div><span class="tag">TIRADA SUR</span><h3>Rasgo + Talento / Conocimiento + D10</h3><small>El resultado entero se convierte directamente a porcentaje SUR.</small></div><div class="combinedRollControls"><select id="rollTrait">${traitOptions}</select><span>+</span><select id="rollSkill">${secondOptions}</select><span>+</span><span class="d10Badge">D10</span><button class="btn primary" onclick="rollCombinedCharacter('${esc(c.id)}')">Lanzar</button><div id="combinedRollResult" class="combinedRollResult">—</div></div></section>
+    <div class="profileHero"><div class="profilePortrait"><div>VROL</div></div><div class="profileIdentity"><span class="tag">PERSONAJE · ${esc(c.status)}</span><h2>${esc(c.name)}</h2><p>Edad inicial: ${p.age} · ${esc(c.universeName||"Universo")}</p><small>Código: ${esc(c.characterCode)} · Jugador: ${esc(c.playerUsername||"Sin asignar")}</small><p class="profileHistory">${esc(c.description||"Sin historia registrada.")}</p></div></div>
+    <section class="profileSection"><div class="profileSectionHead"><h3>Salud y ${esc(uc.energyName||"Energía")}</h3><span>Estado actual</span></div><div class="vitalsGrid"><div class="vitalCard"><div><span>Salud Actual</span><b>${Number(vitals.currentHealth??derived.health??100)}</b><small>Salud Total · ${Number(derived.health??100)}</small></div>${lifeBar(vitals.currentHealth??derived.health??100,derived.health??100)}</div><div class="vitalCard"><div><span>${esc(uc.energyName||"Energía")} Actual</span><b>${Number(vitals.currentEnergy??derived.energy??100)}</b><small>${esc(uc.energyName||"Energía")} Total · ${Number(derived.energy??100)}</small></div>${lifeBar(vitals.currentEnergy??derived.energy??100,derived.energy??100)}</div></div></section>
+    <section class="profileSection"><div class="profileSectionHead"><h3>Partes del cuerpo</h3><span>Distribución de Salud Total</span></div><div class="bodyHealthGrid">${bodyCards}</div></section>
+    <div class="derivedGrid"><div class="derivedCard"><span>Iniciativa</span><b>${Number(derived.initiative||0).toFixed(2).replace(/\.00$/,"")}</b><small>Velocidad + Inteligencia</small></div><div class="derivedCard"><span>Alerta Natural</span><b>${Number(derived.naturalAlert||0).toFixed(2).replace(/\.00$/,"")}</b><small>Inteligencia + Alerta</small></div><div class="derivedCard"><span>EXP Disponible</span><b>${Number(p.experienceAvailable||0).toLocaleString("es-CL")}</b><small>15% reservado para Habilidades + excedentes de límites</small></div></div>
+    ${characterSection("Capacidades Principales",CHARACTER_TRAITS,core,false,{},limitTraits)}
+    ${characterSection("Talentos",talentNames,caps,true,{},{},"")}
+    ${characterSection("Conocimientos",knowledgeNames,caps,true,{},{},"")}
+    ${characterSection("Árbol de la Energía",CHARACTER_TREE,tree,false,{},limitTree)}
+    ${characterSection(uc.donesCategoryName||"Dones",CHARACTER_ELEMENTS,elements,false,Object.fromEntries(CHARACTER_ELEMENTS.map((k,i)=>[k,(uc.donesNames||CHARACTER_ELEMENTS)[i]||k])))}
+    ${renderTechniqueSheetSection(d,uc)}
+    <section class="profileSection"><div class="profileSectionHead"><h3>Habilidades</h3><span>${(d.skills||[]).length}</span></div><div class="skillList">${(d.skills||[]).map(sk=>`<div class="skillRow"><div><b>${esc(sk.name)}</b><small>${Number(sk.exp||0)} EXP</small></div><div class="skillBar"><span style="width:${Math.min(100,Number(sk.exp||0)/10)}%"></span></div></div>`).join("")||`<span class="muted">Sin habilidades registradas.</span>`}</div></section>
+    <section class="profileSection"><div class="profileSectionHead"><h3>Especialidades activadas</h3><span>Talentos y Conocimientos</span></div><div class="specialtyChips">${Object.entries(caps||{}).flatMap(([k,v])=>(v.specialties||[]).map(s=>`<span class="specialtyChip">${esc(k)}: ${esc(s)}</span>`)).join("")||`<span class="muted">Sin especialidades activadas.</span>`}</div></section>
+  </div>`;
+}
+function rollCombinedCharacter(id){
+  const trait=$("#rollTrait")?.value,skill=$("#rollSkill")?.value,result=$("#combinedRollResult");if(!trait||!skill||!result)return;
+  (async()=>{try{const r=await api("getCharacterProfile",{id});const d=r.data;const t=Math.floor(Number(d.traits?.[trait]?.exp||0)/100);const s=Math.floor(Number(d.capacities?.[skill]?.exp||0)/100);const d10=Math.floor(Math.random()*10)+1;const total=t+s+d10;result.innerHTML=`<b>${total}</b><span>${total*10}%</span><small>${esc(trait)} ${t} + ${esc(skill)} ${s} + D10 ${d10}</small>`;}catch(e){alert(e.message)}})();
+}
+function renderTechniqueSection(c,d,uc){const techs=d.techniques||[];const p=d.profile||{};const isOwner=String(c?.playerUserId||"")===String(currentUser.userId);const canGM=currentUser.role==="ADMIN"||currentUser.role==="GM";return `<section class="editorCard techniqueLibraryCard"><div class="profileSectionHead"><h3>${esc(uc.techniqueName||"Técnicas")} y Habilidades</h3><span>Biblioteca del universo · ${techs.length} disponible(s)</span></div><p class="muted">Nivel 1–5 · dominio máximo 100/200/300/400/500 EXP · precisión por dominio y hasta 1–5 efectos sobre el campo Efecto.</p><div class="techniqueList">${techs.map(t=>{const cfg=state.characterConfig?.techniqueLevels?.find(x=>Number(x.level)===Number(t.level))||{};const bought=t.owned&&Number(t.characterTechniqueExp||0)>0;return `<div class="techniqueCard"><div><span class="tag">NIVEL ${t.level}</span><h4>${esc(t.name)}</h4><p>${esc(t.description||"Sin descripción")}</p><small>${t.expMax} EXP · precisión +1 cada ${t.precisionStep} EXP · máximo ${t.maxEnergy} ${esc(uc.energyName||"Energía")} · ${t.maxEffects} efecto(s)</small></div><div class="techniqueActions">${isOwner&&!bought?`<button class="btn primary" onclick="buyTechniqueUI('${c.id}','${t.id}')">Comprar · ${t.expMax} EXP</button>`:bought?`<span class="status">ADQUIRIDA</span>`:canGM?`<button class="btn ghost" onclick="assignTechniqueUI('${c.id}','${t.id}')">Asignar</button>`:`<span class="status">DISPONIBLE</span>`}</div></div>`}).join("")||`<div class="empty">No hay técnicas disponibles en este universo.</div>`}</div></section>`;}
 function renderTechniqueSheetSection(d,uc){return `<section class="profileSection"><div class="profileSectionHead"><h3>${esc(uc.techniqueName||"Técnicas")} y Habilidades adquiridas</h3><span>${(d.techniques||[]).filter(t=>t.owned&&Number(t.characterTechniqueExp||0)>0).length}</span></div><div class="techniqueList">${(d.techniques||[]).filter(t=>t.owned&&Number(t.characterTechniqueExp||0)>0).map(t=>`<div class="techniqueCard"><div><span class="tag">NIVEL ${t.level}</span><h4>${esc(t.name)}</h4><p>${esc(t.description||"")}</p><small>${t.characterTechniqueExp}/${t.expMax} EXP · precisión máxima ${t.precisionAtMax}</small></div></div>`).join("")||`<span class="muted">Sin técnicas adquiridas.</span>`}</div></section>`;}
 function buyTechniqueUI(characterId,techniqueId){(async()=>{try{await api("buyTechnique",{characterId,techniqueId});alert("Técnica adquirida.");characterEditor(characterId)}catch(e){alert(e.message)}})();}
 function assignTechniqueUI(characterId,techniqueId){(async()=>{try{await api("assignTechnique",{characterId,techniqueId});alert("Técnica asignada al personaje.");characterEditor(characterId)}catch(e){alert(e.message)}})();}
-function drawTechniques(d){const can=currentUser.role==="ADMIN"||currentUser.role==="GM";if(!can)return;state.techniques=d.techniques||[];state.techniqueUniverses=d.universes||[];$("#content").innerHTML=head("Técnicas y Habilidades","Biblioteca universal por universo. ADMIN y GM crean el catálogo; los jugadores compran durante creación.",`<button class="btn primary" onclick="techniqueForm()">+ Crear ${esc("Técnica / Habilidad")}</button>`)+`<div class="dataList">${state.techniques.map(t=>`<div class="dataRow"><div class="main"><b>${esc(t.name)}</b><small>${esc(t.universeName)} · Nivel ${t.level} · ${t.expMax} EXP · máximo ${t.maxEnergy} Energía · ${t.maxEffects} efecto(s)</small></div><span class="status">${t.active===true||String(t.active)==="true"?"ACTIVA":"INACTIVA"}</span></div>`).join("")||`<div class="empty">No hay técnicas creadas.</div>`}</div>`;}
-function techniqueForm(){const us=state.techniqueUniverses||[];$("#content").innerHTML=head("Nueva Técnica / Habilidad","Se guarda dentro de un universo y utiliza el modelo de niveles 1–5.",`<button class="btn ghost" onclick="navigate('techniques')">← Volver</button>`)+`<section class="editorCard"><div class="formGrid compact"><label>Nombre<input id="tecName"></label><label>Universo<select id="tecUniverse">${us.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join("")}</select></label><label>Nivel<select id="tecLevel">${[1,2,3,4,5].map(l=>`<option value="${l}">Nivel ${l} · ${l*100} EXP · ${l*20} Energía · ${l} efecto(s)</option>`).join("")}</select></label><label class="full">Descripción<textarea id="tecDescription"></textarea></label></div><div class="profileSection"><div class="profileSectionHead"><h3>5 capacidades base del Árbol</h3><span>El campo Efecto se administra mediante los efectos inferiores.</span></div><div class="formGrid compact">${TECHNIQUE_TREE_BASE.map(n=>`<label>${esc(n)}<input class="tecTree" data-name="${n}" type="number" min="0" max="10" step="1" value="0"></label>`).join("")}</div></div><div class="profileSection"><div class="profileSectionHead"><h3>Efectos</h3><span>Máximo según nivel</span></div><div id="tecEffects"></div><button type="button" class="btn" onclick="addTechniqueEffectRow()">+ Añadir efecto</button></div><div class="notice">Costo sugerido por efecto: 4, 8, 12, 16 y 20 de Energía según su posición. El costo total debe quedar dentro del máximo del nivel.</div><div class="formActions"><button class="btn primary" onclick="submitTechnique()">Crear técnica / habilidad</button></div></section>`;$("#tecLevel").onchange=()=>renderTechniqueEffectRows();renderTechniqueEffectRows();}
+function drawTechniques(d){
+  const can=currentUser.role==="ADMIN"||currentUser.role==="GM";if(!can)return;
+  state.techniques=d.techniques||[];state.techniqueUniverses=d.universes||[];
+  const universeCards=state.techniqueUniverses.map(u=>`<button class="universeLibraryButton" onclick="openTechniqueUniverse('${esc(u.id)}')"><span>${esc(u.name)}</span><small>${state.techniques.filter(t=>String(t.universeId)===String(u.id)).length} habilidad(es)</small></button>`).join("");
+  $("#content").innerHTML=head("Habilidades","Biblioteca separada por universo. Las habilidades se ordenan alfabéticamente dentro de cada universo.",`<button class="btn primary" onclick="techniqueForm()">+ Crear Habilidad</button>`)+`<section class="editorCard"><div class="profileSectionHead"><h3>Universos</h3><span>Selecciona un universo para abrir su biblioteca</span></div><div class="universeLibraryGrid">${universeCards||`<div class="empty">No hay universos disponibles.</div>`}</div></section>`;
+}
+function openTechniqueUniverse(universeId){
+  const u=state.techniqueUniverses.find(x=>String(x.id)===String(universeId)),items=state.techniques.filter(t=>String(t.universeId)===String(universeId)).sort((a,b)=>String(a.name).localeCompare(String(b.name),"es"));
+  $("#content").innerHTML=head("Habilidades",esc(u?.name||"Universo"),`<button class="btn ghost" onclick="navigate('techniques')">← Universos</button> <button class="btn primary" onclick="techniqueForm('${esc(universeId)}')">+ Crear Habilidad</button>`)+`<div class="dataList">${items.map(t=>`<div class="dataRow"><div class="main"><b>${esc(t.name)}</b><small>Nivel ${t.level} · ${t.expMax} EXP · máximo ${t.maxEnergy} ${esc(u?.energyName||"Energía")} · ${t.maxEffects} efecto(s)</small><small>${esc(t.description||"Sin descripción")}</small></div><div class="rowActions"><span class="status">${t.active===true||String(t.active)==="true"?"ACTIVA":"INACTIVA"}</span><button class="btn ghost" onclick="editTechniqueForm('${esc(t.id)}')">Editar</button></div></div>`).join("")||`<div class="empty">No hay habilidades creadas en este universo.</div>`}</div>`;
+}
+
+function techniqueForm(preselectedUniverse=""){const us=state.techniqueUniverses||[];$("#content").innerHTML=head("Nueva Habilidad","Se guarda dentro de un universo y utiliza el modelo de niveles 1–5.",`<button class="btn ghost" onclick="navigate('techniques')">← Volver</button>`)+`<section class="editorCard"><div class="formGrid compact"><label>Nombre<input id="tecName"></label><label>Universo<select id="tecUniverse">${us.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(preselectedUniverse)?"selected":""}>${esc(u.name)}</option>`).join("")}</select></label><label>Nivel<select id="tecLevel">${[1,2,3,4,5].map(l=>`<option value="${l}">Nivel ${l} · ${l*100} EXP · ${l*20} Energía · ${l} efecto(s)</option>`).join("")}</select></label><label class="full">Descripción<textarea id="tecDescription"></textarea></label></div><div class="profileSection"><div class="profileSectionHead"><h3>5 capacidades base del Árbol</h3><span>El campo Efecto se administra mediante los efectos inferiores.</span></div><div class="formGrid compact">${TECHNIQUE_TREE_BASE.map(n=>`<label>${esc(n)}<input class="tecTree" data-name="${n}" type="number" min="0" max="10" step="1" value="0"></label>`).join("")}</div></div><div class="profileSection"><div class="profileSectionHead"><h3>Efectos</h3><span>Máximo según nivel</span></div><div id="tecEffects"></div><button type="button" class="btn" onclick="addTechniqueEffectRow()">+ Añadir efecto</button></div><div class="notice">Costo sugerido por efecto: 4, 8, 12, 16 y 20 de Energía según su posición. El costo total debe quedar dentro del máximo del nivel.</div><div class="formActions"><button class="btn primary" onclick="submitTechnique()">Crear Habilidad</button></div></section>`;$("#tecLevel").onchange=()=>renderTechniqueEffectRows();renderTechniqueEffectRows();}
 function renderTechniqueEffectRows(){const level=Number($("#tecLevel")?.value||1),box=$("#tecEffects");if(!box)return;const count=level;box.innerHTML=Array.from({length:count},(_,i)=>`<div class="techEffectRow"><label>Efecto ${i+1}<input class="tecEffectName" data-index="${i}" placeholder="Nombre del efecto"></label><label>Descripción<input class="tecEffectDesc" data-index="${i}" placeholder="Qué hace"></label><label>Modo / regla<input class="tecEffectMode" data-index="${i}" placeholder="Pendiente de definición"></label><label>Costo de Energía<input class="tecEffectCost" data-index="${i}" type="number" min="0" max="100" value="${(i+1)*4}"></label></div>`).join("");}
 function addTechniqueEffectRow(){const level=Number($("#tecLevel")?.value||1);if(level<5){$("#tecLevel").value=String(level+1);renderTechniqueEffectRows();}else alert("Nivel 5 ya permite los 5 efectos.");}
+function editTechniqueForm(id){
+  const t=state.techniques.find(x=>String(x.id)===String(id));if(!t)return alert("Habilidad no encontrada.");
+  const us=state.techniqueUniverses||[],tree=JSON.parse(t.treeBaseJson||"{}"),effects=JSON.parse(t.effectsJson||"[]");
+  $("#content").innerHTML=head("Editar Habilidad",esc(t.name),`<button class="btn ghost" onclick="openTechniqueUniverse('${esc(t.universeId)}')">← Volver</button>`)+`<section class="editorCard"><div class="formGrid compact"><label>Nombre<input id="tecName" value="${esc(t.name)}"></label><label>Universo<select id="tecUniverse">${us.map(u=>`<option value="${esc(u.id)}" ${String(u.id)===String(t.universeId)?"selected":""}>${esc(u.name)}</option>`).join("")}</select></label><label>Nivel<select id="tecLevel">${[1,2,3,4,5].map(l=>`<option value="${l}" ${Number(t.level)===l?"selected":""}>Nivel ${l} · ${l*100} EXP · ${l*20} Energía · ${l} efecto(s)</option>`).join("")}</select></label><label class="full">Descripción<textarea id="tecDescription">${esc(t.description||"")}</textarea></label></div><div class="profileSection"><div class="profileSectionHead"><h3>5 capacidades base del Árbol</h3><span>El campo Efecto se administra mediante los efectos.</span></div><div class="formGrid compact">${TECHNIQUE_TREE_BASE.map(n=>`<label>${esc(n)}<input class="tecTree" data-name="${n}" type="number" min="0" max="10" step="1" value="${Number(tree[n]||0)}"></label>`).join("")}</div></div><div class="profileSection"><div class="profileSectionHead"><h3>Efectos</h3><span>Máximo según nivel</span></div><div id="tecEffects"></div><button type="button" class="btn" onclick="addTechniqueEffectRow()">+ Añadir efecto</button></div><div class="formActions"><button class="btn primary" onclick="updateTechniqueUI('${esc(t.id)}')">Guardar Habilidad</button></div></section>`;
+  $("#tecLevel").onchange=()=>renderTechniqueEffectRows();
+  renderTechniqueEffectRows();
+  effects.forEach((e,i)=>{const rows=[...document.querySelectorAll(".techEffectRow")];const r=rows[i];if(r){r.querySelector(".tecEffectName").value=e.name||"";r.querySelector(".tecEffectDesc").value=e.description||"";r.querySelector(".tecEffectMode").value=e.mode||"";r.querySelector(".tecEffectCost").value=Number(e.energyCost||0);}});
+}
+function updateTechniqueUI(id){
+  const effects=[...document.querySelectorAll(".techEffectRow")].map((r,i)=>({name:r.querySelector(".tecEffectName")?.value.trim()||`Efecto ${i+1}`,description:r.querySelector(".tecEffectDesc")?.value.trim()||"",mode:r.querySelector(".tecEffectMode")?.value.trim()||"",formula:"",energyCost:Number(r.querySelector(".tecEffectCost")?.value||0)}));
+  const tree=Object.fromEntries([...document.querySelectorAll(".tecTree")].map(e=>[e.dataset.name,Number(e.value||0)]));
+  const payload={id,name:$("#tecName").value.trim(),universeId:$("#tecUniverse").value,level:Number($("#tecLevel").value),description:$("#tecDescription").value,treeBase:tree,effects,active:true};
+  if(!payload.name)return alert("Indica el nombre.");
+  (async()=>{try{await api("updateTechnique",payload);alert("Habilidad actualizada.");navigate("techniques")}catch(e){alert(e.message)}})();
+}
 function submitTechnique(){const effects=[...document.querySelectorAll('.techEffectRow')].map((r,i)=>({name:r.querySelector('.tecEffectName')?.value.trim()||`Efecto ${i+1}`,description:r.querySelector('.tecEffectDesc')?.value.trim()||"",mode:r.querySelector('.tecEffectMode')?.value.trim()||"",formula:"",energyCost:Number(r.querySelector('.tecEffectCost')?.value||0)}));const tree=Object.fromEntries([...document.querySelectorAll('.tecTree')].map(e=>[e.dataset.name,Number(e.value||0)]));const payload={name:$("#tecName").value.trim(),universeId:$("#tecUniverse").value,level:Number($("#tecLevel").value),description:$("#tecDescription").value,treeBase:tree,effects};if(!payload.name)return alert("Indica el nombre.");(async()=>{try{await api('createTechnique',payload);alert('Técnica / habilidad creada.');navigate('techniques')}catch(e){alert(e.message)}})();}
 function rollQuickDice(){const input=$("#quickDiceExpr"),out=$("#quickDiceResult");if(!input||!out)return;const expr=input.value.trim().replace(/\s+/g,"");const m=expr.match(/^(\d+)d(\d+)([+-]\d+)?$/i);if(!m){out.textContent="Formato inválido";return;}const count=Math.max(1,Math.min(100,Number(m[1]))),faces=Math.max(2,Math.min(1000,Number(m[2]))),mod=Number(m[3]||0);let rolls=[],sum=0;for(let i=0;i<count;i++){const r=1+Math.floor(Math.random()*faces);rolls.push(r);sum+=r;}out.textContent=`${rolls.join(" + ")}${mod?` ${mod>0?"+":"-"} ${Math.abs(mod)}`:""} = ${sum+mod}`;}
 async function tableForm(){
@@ -512,32 +633,6 @@ async function sessionForm(){
   }catch(e){$("#content").innerHTML=`<div class="notice danger">${esc(e.message)}</div>`}
 }
 async function logout(){try{await api("logout")}catch(e){}localStorage.removeItem("VROL_TOKEN");localStorage.removeItem("VROL_USER");token="";currentUser=null;window.location.href="index.html"}
-
-/* Preserve the current authenticated content scroll position when an interview choice
-   receives focus. Some browsers otherwise scroll the nearest focused control to the
-   bottom of the page/pane, making the rest of the interview disappear. */
-function preserveInterviewScroll(){
-  const content=document.querySelector('.appShell .content');
-  if(!content)return;
-  let saved=content.scrollTop;
-  const restore=()=>{
-    content.scrollTop=saved;
-    window.scrollTo(0,0);
-  };
-  document.querySelectorAll('.interviewCard input[type="radio"]').forEach(el=>{
-    el.addEventListener('pointerdown',()=>{saved=content.scrollTop;});
-    el.addEventListener('mousedown',()=>{saved=content.scrollTop;});
-    el.addEventListener('focus',()=>{requestAnimationFrame(restore);});
-    el.addEventListener('change',()=>{requestAnimationFrame(restore);setTimeout(restore,0);});
-  });
-}
-
-const _originalCharacterEditor=characterEditor;
-characterEditor=function(id){
-  const result=_originalCharacterEditor(id);
-  setTimeout(preserveInterviewScroll,50);
-  return result;
-};
 
 document.addEventListener("DOMContentLoaded",()=>ensureVROLLoader());
 
