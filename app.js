@@ -437,6 +437,9 @@ function characterEditor(id){
     try{
       const r=await api("getCharacterProfile",{id});
       const d=r.data, p=d.profile, c=d.character;
+      // La configuración de entrevista debe provenir del universo del personaje.
+      // No dependemos de la configuración que pudiera quedar en memoria desde otra vista/universo.
+      state.characterConfig=d.characterConfig||state.characterConfig||{};
       const cfg=state.characterConfig||{};
       const interview=cfg.interview||[];
       const canAdmin=currentUser.role==="ADMIN";
@@ -514,7 +517,20 @@ function toggleSpecialtyUI(characterId,capacity,specialty,button){
   api("saveCharacterProfile",{id:characterId,specialties:[{capacity,specialties:selected}]}).catch(e=>alert(e.message));
 }
 function submitCharacterInterview(id){
-  (async()=>{const cfg=state.characterConfig||{};const qs=cfg.interview||[];const answers=qs.map(q=>{const el=document.querySelector(`input[name="q${q.no}"]:checked`);return {questionNo:q.no,choiceNo:el?Number(el.value):0}});if(answers.some(x=>!x.choiceNo)){alert("Debes responder las 6 preguntas de la entrevista.");return}const name=$("#interviewName")?.value.trim();if(!name){alert("Debes indicar el nombre del personaje.");return}try{await api("applyCharacterInterview",{id,name,age:Number($("#interviewAge")?.value||10),origin:$("#interviewOrigin")?.value.trim(),appearance:$("#interviewAppearance")?.value.trim(),personality:$("#interviewPersonality")?.value.trim(),motivation:$("#interviewMotivation")?.value.trim(),description:$("#interviewDescription")?.value.trim(),answers});alert("Entrevista completada. El personaje ya puede continuar con su distribución de EXP.");characterEditor(id)}catch(e){alert(e.message)}})();
+  (async()=>{
+    const cfg=state.characterConfig||{};
+    const qs=Array.isArray(cfg.interview)?cfg.interview:[];
+    if(qs.length!==6){alert("No se pudo cargar la configuración completa de la entrevista para este universo. Recarga la ficha e inténtalo nuevamente.");return;}
+    const answers=qs.map(q=>{const el=document.querySelector(`input[name="q${q.no}"]:checked`);return {questionNo:q.no,choiceNo:el?Number(el.value):0}});
+    if(answers.some(x=>!x.choiceNo)){alert("Debes responder las 6 preguntas de la entrevista.");return}
+    const name=$("#interviewName")?.value.trim();
+    if(!name){alert("Debes indicar el nombre del personaje.");return}
+    try{
+      await api("applyCharacterInterview",{id,name,age:Number($("#interviewAge")?.value||10),origin:$("#interviewOrigin")?.value.trim(),appearance:$("#interviewAppearance")?.value.trim(),personality:$("#interviewPersonality")?.value.trim(),motivation:$("#interviewMotivation")?.value.trim(),description:$("#interviewDescription")?.value.trim(),answers});
+      alert("Entrevista completada. El personaje ya puede continuar con su distribución de EXP.");
+      characterEditor(id);
+    }catch(e){alert(e.message)}
+  })();
 }
 function setupXPTargets(d){
   const cat=$("#xpCategory"), target=$("#xpTarget"); if(!cat||!target)return;
