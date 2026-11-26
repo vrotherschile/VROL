@@ -219,6 +219,8 @@ function drawUniverses(d){
   $("#content").innerHTML=head("Universos",currentUser.role==="ADMIN"?"Administración global de universos.":"Universos que administras.",currentUser.role!=="PLAYER"?`<button class="btn primary" onclick="universeForm()">+ Universo</button>`:"")+`<div class="dataList">${d.universes.map(u=>`<div class="dataRow"><div class="main"><b>${esc(u.name)}</b><small>${esc(u.description||"")} · GM principal: ${esc(u.primaryGMUsername||"—")} · ${u.gmCount} GM(s)</small></div><div><span class="status">${esc(u.status)}</span>${currentUser.role==="ADMIN"?` <button class="btn ghost" onclick="editUniverse('${u.id}')">Editar</button>`:""}</div></div>`).join("")||`<div class="empty">No hay universos disponibles.</div>`}</div>`}
 function drawCharacters(d){
   state.characters=d.characters||[];
+  state.characterPlayers=d.characterPlayers||[];
+  state.characterUniverses=d.characterUniverses||[];
   state.characterConfig=d.characterConfig||state.characterConfig||{};
   const canEdit=currentUser.role==="ADMIN"||currentUser.role==="GM";
   const createBtns=currentUser.role==="ADMIN"?`<button class="btn ghost" onclick="advancedCharacterForm()">+ Personaje avanzado</button> <button class="btn primary" onclick="characterForm()">+ Personaje</button>`:currentUser.role==="GM"?`<button class="btn primary" onclick="characterForm()">+ Personaje</button>`:`<button class="btn primary" onclick="characterForm()">+ Mi personaje</button>`;
@@ -319,7 +321,7 @@ function manageUniverseGMUI(universeId,mode,username){
   (async()=>{try{await api("manageUniverseGM",{universeId,username:user,mode});alert(mode==="ADD"?"GM añadido al universo.":"GM retirado del universo.");editUniverse(universeId)}catch(e){alert(e.message)}})();
 }
 async function deleteUniverse(id){if(confirm("Se marcará como eliminado y se conservará el registro.")){await api("deleteUniverse",{id});navigate("universes");loadPublic()}}
-function characterForm(){
+function characterForm(preselectedUniverse=""){
   const players=state.characterPlayers||[], universes=state.characterUniverses||[];
   const isPlayer=currentUser.role==="PLAYER";
   const playerField=isPlayer?`<div class="notice full">Jugador: <b>${esc(currentUser.username)}</b>. En VROL, ADMIN, GM y PLAYER pueden ser propietarios/jugadores de personajes. JO permite un solo personaje por jugador dentro de cada universo.</div>`:`<label>Jugador<select name="playerUsername"><option value="${esc(currentUser.username)}">${esc(currentUser.username)} · ${esc(currentUser.role)} (yo)</option>${players.filter(p=>String(p.username)!==String(currentUser.username)).map(p=>`<option value="${esc(p.username)}">${esc(p.username)} · ${esc(p.role||"PLAYER")}</option>`).join("")}</select></label>`;
